@@ -104,6 +104,15 @@ function align(chars, syllablesOf, index = 0, at = 0) {
   const options = readings.get(chars[index]);
   if (!options) return null;
 
+  // Erhua. A final 儿 is not a syllable of its own — it colours the syllable
+  // before it, so 哪儿 is nǎr and not nǎ ér. One character has no syllable to
+  // line up with, which is exactly what the rest of this function forbids, so
+  // it is spelled out here rather than smuggled in as a reading.
+  if (chars[index] === '儿' && index === chars.length - 1) {
+    const tail = syllablesOf.bare.slice(at);
+    if (tail === 'r' || tail === '') return true;
+  }
+
   for (const reading of options) {
     const toneless = bare(reading);
     if (!toneless || !syllablesOf.bare.startsWith(toneless, at)) continue;

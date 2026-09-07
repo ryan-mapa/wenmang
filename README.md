@@ -23,7 +23,7 @@ No build step — ES modules straight from the filesystem:
 npm install
 npm run serve      # the game alone, on :8000
 npm run dev        # the game plus the API and a local database, on :8787
-npm test           # 143 tests
+npm test           # 149 tests
 ```
 
 Use `serve` for anything that does not touch accounts; it is faster to start
@@ -32,10 +32,11 @@ sync.
 
 ## How it works
 
-**Words.** Rounds of 20 multiple-choice questions over four decks. Distractors
-come from the same deck, so a question is a real test rather than a reading
-exercise. A card climbs a box on a right answer and falls to the bottom on a
-wrong one, with intervals in real time rather than question counts.
+**Words.** 1,760 words across 25 decks, in rounds of 20 multiple-choice
+questions. Distractors come from the same deck, so a question is a real test
+rather than a reading exercise. A card climbs a box on a right answer and falls
+to the bottom on a wrong one, with intervals in real time rather than question
+counts.
 
 **Direction.** 中文 → English is recognition; English → 中文 is recall, and in
 Chinese the gap is wider than in a language written with an alphabet — you can
@@ -56,6 +57,18 @@ characters from the full vocabulary, or **Known words** for words whose latest
 answer was correct (box 1 or higher). This choice is saved on this browser.
 Characters retain an example word for context. An empty Known words selection
 explains how to start rather than locking the Characters tab.
+
+**Writing is by the word, not the character.** A round asks you to write 狐狸,
+not 狐 — the pad gives one square per character in reading order, and the word
+above it is the prompt. Practising half of a two-character word teaches a shape
+without the word it belongs to, and leaves you guessing which half was meant.
+Repeats get their own square: 妈妈 is written twice, because that is what
+writing 妈妈 is.
+
+Scheduling still runs on characters, since that is what progress is tracked
+against — the scheduler picks the character most in need of work and the word
+comes with it. A round is counted in characters rather than words, so the
+hand-work is consistent whichever words come up.
 
 **Writing has three modes**, and one rule that matters:
 
@@ -110,16 +123,17 @@ carries its mode.
 
 ```
 source/
-  vocab.js          the decks — 159 words, four categories, Basics stage
+  vocab.js          the decks — 1,760 words, 25 categories, three stages each
   game.js           word-round state: mixed direction, recall weighting, scoring
   character-data.js GENERATED radical and stroke counts (tools/build-characters.mjs)
   radicals.js       the 214 Kangxi radicals, forms and glosses
-  characters.js     which characters are unlocked, and in what teaching order
-  writing.js        the three modes, the hint ladder, the mastery cap
+  characters.js     the character inventory, writing order, and radical data
+  writing.js        the three modes, the mastery cap, character history folding
+  hints.js          the hint ladder — split out so writing.js stays Worker-safe
   strokes.js        the ONLY module that knows where stroke geometry comes from
   srs.js            Leitner scheduling, for word cards and character cards alike
   quiz.js           multiple-choice construction
-  rounds.js         character-round composition and which round types are open
+  rounds.js         writing rounds, built from whole words
   stages.js         stage gating within a deck
   goals.js          the daily goal and the streak
   script.js         characters / pinyin / both
@@ -135,13 +149,38 @@ worker/
 Every rule lives in `source/` and is tested without a browser. `main.js` is
 screen wiring only.
 
-## Regenerating character data
+## The vocabulary, and how it is checked
+
+1,760 words: exactly half of [Vocabulario](https://vocabulario.ryan-mapa.dev)'s
+3,520, across the same 25 categories so the two apps read as siblings. Seven
+decks are deliberately smaller, for the same reasons its are — Numbers Basics
+*is* 0–20, and Questions & Connectors is a closed class throughout. Padding
+those to a round number would mean inventing filler.
+
+**Tones are machine-checked.** A wrong gloss is caught by anyone who reads it; a
+wrong tone is not, and it is the error that teaches somebody to say a word wrong
+for years. So every entry's pinyin is checked against the readings Unicode
+records for each character — one syllable per character, in order, with the tone
+compared against the reading that produced the match:
 
 ```sh
 curl -O https://www.unicode.org/Public/UCD/latest/ucd/Unihan.zip
 unzip -d /tmp/unihan Unihan.zip
-node tools/build-characters.mjs /tmp/unihan
+node tools/check-vocab.mjs /tmp/unihan      # tones, duplicates, deck sizes
+node tools/build-characters.mjs /tmp/unihan # regenerate character-data.js
 ```
+
+The checker is generous about *which* reading counts, taking the union of four
+Unihan fields, because 多音字 are common and a word may use a rare reading. It
+is strict about shape: syllables must line up with characters one for one, which
+is what catches a dropped or spurious syllable. Neutral tone is accepted
+anywhere but the first syllable — 桌子 really is zhuōzi — and 一, 不 and 儿 take
+any tone, since theirs changes in context. A final 儿 may also be absorbed
+entirely, because 哪儿 is nǎr and not nǎ ér.
+
+What it cannot check, and does not pretend to, is whether a gloss is the right
+English or whether the register is natural. **The vocabulary has not been
+reviewed by a native speaker.**
 
 ## Deploying
 
@@ -163,8 +202,11 @@ an authorized redirect URI. Without `GOOGLE_CLIENT_ID` set, `/auth/google/start`
 answers 503 and the app simply never shows the account controls — which is also
 what happens on a plain static host with no Worker at all.
 
-**Before going live:** Google requires a privacy policy on the OAuth consent
-screen. Vocabulario has `/privacy` and `/terms` pages; this does not yet.
+Google requires a privacy policy on the OAuth consent screen; `/privacy` and
+`/terms` are served from this repository for that purpose. The App domain
+fields want `https://wenmang.ryan-mapa.dev` and those two paths, while
+**Authorized domains** takes the registrable domain alone — `ryan-mapa.dev`,
+not the subdomain, which Google rejects there.
 
 ## Licensing
 
@@ -192,11 +234,11 @@ kept for misses and for danger.
 
 - **Audio.** Deliberately deferred. Word records already carry pinyin, so adding
   voices is additive rather than a migration.
-- **Vocabulary depth.** Only the Basics stage is authored, 40 words per deck.
-  `Everyday` and `Fluent` are declared empty so the stage machinery has the
-  shape it expects and the gap is visible in the data rather than at runtime.
-- **Privacy and terms pages.** Needed before the Google consent screen can be
-  published.
-- **Multi-character phrases on the pad.** The pad writes one character at a
-  time; the spec calls for phrase display, which needs a row of pads.
+- **A native-speaker review of the vocabulary.** Tones are verified against
+  Unihan, but register and naturalness are not machine-checkable and have not
+  been read by anyone who would notice.
 - **Example sentences.** Vocabulario has one per word; this has none yet.
+- **A third-party request on every character.** Stroke data is fetched from
+  jsDelivr as you practise, which is disclosed in the privacy policy. Avoiding
+  it means self-hosting the data and taking on the Arphic notice obligations —
+  a deliberate trade either way, not an oversight.

@@ -84,7 +84,18 @@ describe('lookups', () => {
   });
 
   it('collects a deck across its stages', () => {
-    expect(deckWords('shiwu')).toEqual(stageWords('shiwu', 0));
+    const [basics, everyday, fluent] = [0, 1, 2].map((stage) => stageWords('shiwu', stage));
+    expect(deckWords('shiwu')).toEqual([...basics, ...everyday, ...fluent]);
+  });
+
+  it('has every stage of every deck populated', () => {
+    // Everyday and Fluent shipped empty at first, and the stage machinery was
+    // built to cope with that. It no longer has to.
+    for (const deck of DECKS) {
+      for (const [stage, words] of deck.stages.entries()) {
+        expect(words.length, `${deck.id} stage ${stage}`).toBeGreaterThan(0);
+      }
+    }
   });
 
   it('collects every deck for the combined id', () => {

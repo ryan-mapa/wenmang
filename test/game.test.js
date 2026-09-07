@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createGame, recallChance, ROUND_LENGTH, MIXED } from '../source/game.js';
 import { mulberry32 } from '../source/random.js';
 import { newCard, BOX_COUNT } from '../source/srs.js';
-import { ALL_DECK_ID } from '../source/vocab.js';
+import { ALL_DECK_ID, stageWords } from '../source/vocab.js';
 
 const rng = () => mulberry32(9);
 const game = (options = {}) =>
@@ -29,11 +29,14 @@ describe('starting a round', () => {
     expect(() => game({ stages: [1] })).toThrow(/locked/);
   });
 
-  it('refuses a stage with no words', () => {
-    // Stage 1 is unlocked once stage 0 is mastered, but it is still empty.
+  it('opens a deeper stage once the one before it is mastered', () => {
+    // Every stage carries words now, so reaching Everyday is a question of
+    // mastery rather than of whether anything was authored there.
     const cards = {};
-    for (const w of ['苹果', '面包', '牛奶']) cards[w] = { ...newCard(), box: BOX_COUNT - 1 };
-    expect(() => createGame({ deckId: 'shiwu', stages: [1], cards, random: rng() })).toThrow();
+    for (const word of stageWords('shiwu', 0)) {
+      cards[word.zh] = { ...newCard(), box: BOX_COUNT - 1 };
+    }
+    expect(() => createGame({ deckId: 'shiwu', stages: [1], cards, random: rng() })).not.toThrow();
   });
 
   it('runs over every deck at once for the combined id', () => {
