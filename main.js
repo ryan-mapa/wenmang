@@ -1539,14 +1539,27 @@ document.addEventListener('keydown', (event) => {
   }
 
   if (event.key === 'Enter') {
+    // Enter on a focused control presses that control — the browser fires its
+    // click for us. Carrying on here as well would replay the audio and skip
+    // the question in one keystroke, the keyboard form of the same bug the
+    // card's click handler guards against. A *disabled* control is not
+    // exempted: a spent choice button cannot be pressed, so Enter still means
+    // carry on.
+    if (document.activeElement?.closest?.('button:enabled, a[href]')) return;
     if (!ui.summary.hidden) startRound();
     else if (!ui.play.hidden) advance();
   }
 });
 
 // Tapping the card carries on after a miss — a phone has no Enter key.
+//
+// Every control inside the card is exempt, because its click bubbles up to
+// here: pressing the speaker or opening the example would otherwise throw the
+// question away as a side effect of the thing you actually asked for. Naming
+// .choice alone was not enough — the speaker, the example toggle, the hint and
+// the skip are all buttons in the card too.
 ui.play.addEventListener('click', (event) => {
-  if (event.target.closest('.choice')) return;
+  if (event.target.closest('button, a, input, select, label')) return;
   if (game?.state.lastAnswer) advance();
 });
 
