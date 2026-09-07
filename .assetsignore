@@ -1,0 +1,12 @@
+.git
+.github
+node_modules
+test
+tools
+worker
+package.json
+package-lock.json
+vitest.config.js
+wrangler.toml
+.assetsignore
+.gitignore

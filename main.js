@@ -15,9 +15,11 @@ import { buildCharacterRound, availableRounds, CHARACTER_ROUND_LENGTH } from './
 import { availableCharacters, characterInfo } from './source/characters.js';
 import {
   MODES, MODE_LABELS, MODE_DESCRIPTIONS, newAttempt, recordStroke, takeHint,
-  reviewCharacter, isSuccess, hintAt, HINT_LEVELS, capExplanation
+  reviewCharacter, isSuccess, capExplanation
 } from './source/writing.js';
+import { hintAt, HINT_LEVELS } from './source/hints.js';
 import { loadCharacter, writerOptions, demonstratesFirst, ATTRIBUTION } from './source/strokes.js';
+import { fetchMe, sync as pushPull, deleteAccount, signOut as endSession } from './source/api.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -28,6 +30,27 @@ const ui = {
   scriptToggle: el('script-toggle'),
   scriptLabel: el('script-label'),
   guardShield: el('guard-shield'),
+
+  auth: el('auth'),
+  signIn: el('sign-in'),
+  authUser: el('auth-user'),
+  authName: el('auth-name'),
+  authNote: el('auth-note'),
+  account: el('account'),
+  accountDialog: el('account-dialog'),
+  accountBody: el('account-body'),
+  accountClose: el('account-close'),
+  accountDanger: el('account-danger'),
+  signOut: el('sign-out'),
+  deleteStart: el('delete-start'),
+  deleteDialog: el('delete-dialog'),
+  deleteCancel: el('delete-cancel'),
+  deleteContinue: el('delete-continue'),
+  deleteFinal: el('delete-final'),
+  deleteTyped: el('delete-typed'),
+  deleteStatus: el('delete-status'),
+  deleteFinalCancel: el('delete-final-cancel'),
+  deleteConfirm: el('delete-confirm'),
   guardBadge: el('guard-badge'),
 
   today: el('today'),
@@ -115,6 +138,9 @@ let preferredMode = null;
 let game = null;
 let charRound = null;
 let writer = null;
+
+/** Whether an account is signed in. False also covers "there is no API here". */
+let signedIn = false;
 
 let roundCredited = false;
 let depthAtRoundStart = 0;
@@ -442,6 +468,20 @@ function submit(choice) {
   const question = result.question;
 
   data = store.withCards(data, { ...data.cards, ...game.state.cards });
+
+  // Recorded whether or not anybody is signed in. History written from the
+  // start is what lets somebody who signs in later bring real history with
+  // them rather than only a snapshot of where they ended up.
+  store.queueReview({
+    id: store.newReviewId(),
+    kind: 'word',
+    item: question.word.zh,
+    deckId: game.state.deckId,
+    stage: Number.isInteger(question.word.stage) ? question.word.stage : null,
+    direction: question.direction,
+    correct: result.correct,
+    reviewedAt: result.at
+  });
   persist();
 
   for (const node of ui.choices.children) {
@@ -488,7 +528,7 @@ function startCharacterRound() {
     return startWordRound();
   }
 
-  charRound = { items, index: 0, right: 0, attempt: null, hintLevel: 0 };
+  charRound = { items, index: 0, right: 0, attempt: null, hintLevel: 0, startedAt: Date.now() };
   game = null;
 
   ui.play.hidden = true;
@@ -559,6 +599,17 @@ function finishCharacter(item) {
   const success = isSuccess(charRound.attempt);
 
   data = store.withChars(data, { ...data.chars, [item.char]: reviewCharacter(card, charRound.attempt, now) });
+
+  // The mode travels with the review. Without it the server could not replay
+  // the caps, and would have to guess — in the direction that flatters.
+  store.queueReview({
+    id: store.newReviewId(),
+    kind: 'char',
+    item: item.char,
+    mode: item.mode,
+    correct: success,
+    reviewedAt: now
+  });
   persist();
 
   if (success) charRound.right += 1;
@@ -623,11 +674,27 @@ function startRound() {
   else startWordRound();
 }
 
-function creditRound() {
+function creditRound({ asked, correct, startedAt }) {
   const today = localDay();
   const before = streakFrom(data.days, today, data.guards);
 
   data = store.withDays(data, recordRound(data.days, today));
+
+  // The streak is derived from rounds, so a round is the thing that has to
+  // reach the server. `localDay` is stamped here, in the learner's own
+  // calendar, and treated as opaque text from this point on.
+  store.queueRound({
+    id: store.newReviewId(),
+    type: roundType,
+    localDay: today,
+    deckId: ui.deck.value,
+    stages: stages.join(','),
+    direction: roundType === 'words' ? ui.direction.value : 'n/a',
+    asked,
+    correct,
+    startedAt,
+    endedAt: Date.now()
+  });
 
   // Finishing a round picks the streak up again by itself — nobody should have
   // to remember to turn their own guard off.
@@ -648,8 +715,15 @@ function showSummary() {
   if (roundCredited) return;
   roundCredited = true;
 
-  const streaks = creditRound();
   const wasWords = roundType === 'words';
+  const asked = wasWords ? game.state.asked : charRound.items.length;
+  const correct = wasWords ? game.state.correct : charRound.right;
+
+  const streaks = creditRound({
+    asked,
+    correct,
+    startedAt: wasWords ? game.state.startedAt : charRound.startedAt
+  });
 
   ui.play.hidden = true;
   ui.write.hidden = true;
@@ -661,9 +735,7 @@ function showSummary() {
   renderScoreboard();
   ui.roundProgress.style.width = '100%';
 
-  const accuracy = wasWords
-    ? game.accuracy()
-    : charRound.right / charRound.items.length;
+  const accuracy = asked === 0 ? 0 : correct / asked;
 
   ui.summaryTitle.textContent = wasWords ? 'Round complete!' : 'Characters done!';
   ui.summaryAccuracy.textContent = `${Math.round(accuracy * 100)}%`;
@@ -691,6 +763,8 @@ function showSummary() {
   // After the summary is up, so the notice lands on top of it rather than being
   // the first thing seen and hiding what the round achieved.
   if (streaks.released) noticeGuard(GUARD.ACTIVE, true);
+
+  syncProgress();
 }
 
 function renderGoalBanner(streaks) {
@@ -758,6 +832,153 @@ ui.guardToggle.addEventListener('click', () => {
 ui.scoreboardNote.addEventListener('click', (event) => {
   if (event.target.closest('[data-open-guard]')) openGuardDialog();
 });
+
+
+// ------------------------------------------------------------- account
+
+/**
+ * Ask the server who we are.
+ *
+ * A null answer means there is no API behind this copy of the app — it is
+ * being served by a plain static host — so the account controls stay hidden
+ * rather than offering something that cannot work.
+ */
+async function refreshAuth() {
+  const me = await fetchMe();
+  if (!me) {
+    ui.auth.hidden = true;
+    signedIn = false;
+    return;
+  }
+
+  ui.auth.hidden = false;
+  signedIn = me.signedIn;
+  ui.signIn.hidden = signedIn;
+  ui.authUser.hidden = !signedIn;
+  ui.account.hidden = !signedIn;
+  ui.authName.textContent = me.name ?? '';
+}
+
+/**
+ * Push what this device has done and pull what every other device has.
+ *
+ * Both directions in one request, because that is what makes the merge safe:
+ * the reviews just uploaded are already in the log when the server folds, so
+ * the cards coming back can never be behind what was sent.
+ *
+ * Failure is silent and harmless. The outbox is only cleared for the ids the
+ * server confirms, so an unreachable server means the work waits rather than
+ * being lost.
+ */
+async function syncProgress() {
+  if (!signedIn) return;
+
+  const first = data.syncedAt === 0;
+  const result = await pushPull({
+    since: data.syncedAt,
+    reviews: store.readOutbox(),
+    rounds: store.readRoundOutbox(),
+    guards: data.guards,
+    // Only on a first sync: progress earned in this browser before there was
+    // an account, handed over as snapshots rather than as invented history.
+    imports: first ? store.importSeeds(data) : [],
+    days: first ? store.dayHandover(data) : []
+  });
+  if (!result) return;
+
+  store.clearQueued(result.accepted ?? []);
+  store.clearQueuedRounds(result.acceptedRounds ?? []);
+
+  // Server cards win: they are the fold over every device's history, including
+  // the answers this request just delivered.
+  data = store.withCards(data, { ...data.cards, ...result.cards });
+  data = store.withChars(data, { ...data.chars, ...result.chars });
+  data = store.withDays(data, { ...data.days, ...result.days });
+  data = store.withGuards(data, [...data.guards, ...(result.guards ?? [])]);
+  data = store.withSyncedAt(data, result.serverTime);
+  persist();
+
+  // A round in progress works from its own copy of the cards, taken when it
+  // started. Without this hand-off the next answer would write that stale copy
+  // straight back over everything the sync just brought in.
+  game?.adoptCards(data.cards);
+
+  populateDecks();
+  renderPracticeRow();
+  renderStages();
+  renderScoreboard();
+}
+
+function openAccount() {
+  ui.accountBody.textContent = signedIn
+    ? 'Your progress is saved to your account and follows you to any browser you sign in on.'
+    : 'Sign in to keep your progress across devices.';
+  ui.signOut.hidden = !signedIn;
+  ui.accountDanger.hidden = !signedIn;
+  ui.accountDialog.showModal();
+}
+
+ui.account.addEventListener('click', openAccount);
+ui.accountClose.addEventListener('click', () => ui.accountDialog.close());
+
+ui.signOut.addEventListener('click', async () => {
+  await endSession();
+  ui.accountDialog.close();
+  location.assign('/');
+});
+
+ui.deleteStart.addEventListener('click', () => {
+  ui.accountDialog.close();
+  ui.deleteDialog.showModal();
+});
+ui.deleteCancel.addEventListener('click', () => ui.deleteDialog.close());
+
+ui.deleteContinue.addEventListener('click', () => {
+  ui.deleteDialog.close();
+  ui.deleteTyped.value = '';
+  ui.deleteConfirm.disabled = true;
+  ui.deleteStatus.textContent = '';
+  ui.deleteFinal.showModal();
+});
+ui.deleteFinalCancel.addEventListener('click', () => ui.deleteFinal.close());
+
+// Typing the word is the confirmation. The button stays inert until it matches,
+// so the irreversible action cannot be reached by a stray double-click.
+ui.deleteTyped.addEventListener('input', () => {
+  ui.deleteConfirm.disabled = ui.deleteTyped.value.trim().toLowerCase() !== 'delete';
+});
+
+ui.deleteConfirm.addEventListener('click', async () => {
+  ui.deleteConfirm.disabled = true;
+  say(ui.deleteStatus, 'Deleting…', '');
+
+  // Local progress is only wiped once the server confirms. Guessing would
+  // leave somebody believing their data is gone when it is not.
+  if (!(await deleteAccount())) {
+    say(ui.deleteStatus, 'That did not work. Nothing was deleted.', 'bad');
+    ui.deleteConfirm.disabled = false;
+    return;
+  }
+  store.reset();
+  location.assign('/');
+});
+
+/**
+ * The Google round trip comes back as ?auth=ok or ?auth=failed. Read it, say
+ * something, then strip it — a reload should not repeat the message, and the
+ * address bar should not keep carrying it.
+ */
+function readAuthResult() {
+  const params = new URLSearchParams(location.search);
+  const result = params.get('auth');
+  if (!result) return;
+
+  if (result === 'failed') {
+    ui.authNote.hidden = false;
+    ui.authNote.textContent = 'Sign-in did not complete. Try again.';
+  }
+  history.replaceState(null, '', location.pathname);
+}
 
 // ------------------------------------------------------------- transfer
 
@@ -938,3 +1159,8 @@ populateDecks();
 ui.direction.value = MIXED;
 fitDirectionOption();
 startRound();
+
+readAuthResult();
+// Sign-in state first, then a sync: the sync is a no-op until we know there is
+// an account behind it.
+refreshAuth().then(syncProgress);

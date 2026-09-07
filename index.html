@@ -31,6 +31,32 @@
         <span class="wordmark-latin">Wenmang</span>
       </div>
 
+      <!-- Hidden until /me answers. The same files are served from a plain
+           static host too, where there is no API behind them and an account
+           control would be a dead end. -->
+      <div class="auth" id="auth" hidden>
+        <a class="google-btn" id="sign-in" href="/auth/google/start" aria-label="Sign in with Google">
+          <svg class="g-mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+            <path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/>
+            <path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/>
+            <path fill="#FBBC05" d="M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z"/>
+            <path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"/>
+          </svg>
+          <span class="google-btn-label">Sign in with Google</span>
+        </a>
+        <div class="auth-user" id="auth-user" hidden>
+          <svg class="g-mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+            <path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/>
+            <path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/>
+            <path fill="#FBBC05" d="M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z"/>
+            <path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"/>
+          </svg>
+          <span class="auth-name" id="auth-name" translate="no"></span>
+        </div>
+        <button class="ghost" id="account" type="button">Account</button>
+        <p class="auth-note" id="auth-note" role="status" aria-live="polite" hidden></p>
+      </div>
+
       <div class="settings">
         <label class="field field-deck">
           <span>Deck</span>
@@ -209,6 +235,44 @@
       <div class="confirm-actions">
         <button class="ghost" id="transfer-close" type="button" autofocus>Close</button>
         <button class="danger" id="transfer-import" type="button">Replace my progress</button>
+      </div>
+    </dialog>
+    <dialog class="confirm" id="account-dialog" aria-labelledby="account-title">
+      <h2 id="account-title">Your account</h2>
+      <p class="confirm-body" id="account-body"></p>
+      <div class="confirm-actions">
+        <button class="ghost" id="account-close" type="button" autofocus>Close</button>
+        <button class="ghost" id="sign-out" type="button" hidden>Sign out</button>
+      </div>
+      <p class="account-danger-note" id="account-danger" hidden>
+        <button class="linkish" id="delete-start" type="button">Delete my account…</button>
+      </p>
+    </dialog>
+
+    <dialog class="confirm" id="delete-dialog" aria-labelledby="delete-title">
+      <h2 id="delete-title">Delete your account?</h2>
+      <p class="confirm-body">
+        Everything goes: every word you have learned, every character you can
+        write, every answer, every round, and your streak. There is no backup
+        and no way back.
+      </p>
+      <div class="confirm-actions">
+        <button class="ghost" id="delete-cancel" type="button" autofocus>Keep my account</button>
+        <button class="danger" id="delete-continue" type="button">Continue</button>
+      </div>
+    </dialog>
+
+    <dialog class="confirm" id="delete-final" aria-labelledby="delete-final-title">
+      <h2 id="delete-final-title">This cannot be undone</h2>
+      <p class="confirm-body">Type <strong>delete</strong> to confirm.</p>
+      <label class="transfer-field">
+        <span>Type delete</span>
+        <input class="confirm-input" id="delete-typed" type="text" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="transfer-status" id="delete-status" role="status" aria-live="polite"></p>
+      <div class="confirm-actions">
+        <button class="ghost" id="delete-final-cancel" type="button" autofocus>Cancel</button>
+        <button class="danger" id="delete-confirm" type="button" disabled>Delete everything</button>
       </div>
     </dialog>
   </main>

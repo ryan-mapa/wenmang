@@ -15,9 +15,14 @@ No build step — ES modules straight from the filesystem:
 
 ```sh
 npm install
-npm run serve      # http://localhost:8000
-npm test           # 138 tests
+npm run serve      # the game alone, on :8000
+npm run dev        # the game plus the API and a local database, on :8787
+npm test           # 143 tests
 ```
+
+Use `serve` for anything that does not touch accounts; it is faster to start
+and needs nothing configured. Use `dev` when you are working on sign-in or
+sync.
 
 ## How it works
 
@@ -76,6 +81,23 @@ decided to protect; finishing a round releases it again by itself.
 as a code and pasted into another browser or device. The code carries both the
 words and the handwriting.
 
+**Accounts.** Signing in with Google is optional and always will be — the app
+works fully signed out on localStorage, and an account only adds progress that
+follows you between devices. Only `openid profile` is requested, so no email
+address is ever asked for or stored.
+
+Answers are recorded from the very first round whether or not anybody is signed
+in, which is what lets somebody who signs in later bring real history with them
+instead of only a snapshot. On the server that history is the source of truth
+and a card is a fold over it, so two devices merge without a conflict: the log
+is a set union and the fold is deterministic.
+
+Character history folds differently from word history, and has to. A
+character's box depends on the *mode* each attempt was made in, so replaying it
+means replaying the caps — otherwise a character somebody has only ever traced
+would come back from the server mastered. That is why every character review
+carries its mode.
+
 ## Layout
 
 ```
@@ -94,6 +116,12 @@ source/
   goals.js          the daily goal and the streak
   script.js         characters / pinyin / both
   storage.js        localStorage, with word and character progress kept apart
+  api.js            talking to the Worker; resolves to "no API here" on a static host
+worker/
+  src/index.js      routes, Google OAuth, session cookie, account deletion
+  src/auth.js       HMAC-SHA256 JWT on Web Crypto
+  src/sync.js       push answers, pull cards; folds each kind by its own rule
+  migrations/       D1 schema
 ```
 
 Every rule lives in `source/` and is tested without a browser. `main.js` is
@@ -106,6 +134,29 @@ curl -O https://www.unicode.org/Public/UCD/latest/ucd/Unihan.zip
 unzip -d /tmp/unihan Unihan.zip
 node tools/build-characters.mjs /tmp/unihan
 ```
+
+## Deploying
+
+The Worker serves the app *and* the API from one origin, so there is no CORS
+and the session can ride in an HttpOnly cookie that page scripts — and
+therefore any XSS — cannot read.
+
+```sh
+npx wrangler d1 create wenmang        # put the id in wrangler.toml
+npm run db:apply                      # or db:local for the dev database
+npx wrangler secret put JWT_SECRET            # random 32+ bytes
+npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put GOOGLE_CLIENT_SECRET
+npm run deploy
+```
+
+The Google OAuth client needs `https://<your-domain>/auth/google/callback` as
+an authorized redirect URI. Without `GOOGLE_CLIENT_ID` set, `/auth/google/start`
+answers 503 and the app simply never shows the account controls — which is also
+what happens on a plain static host with no Worker at all.
+
+**Before going live:** Google requires a privacy policy on the OAuth consent
+screen. Vocabulario has `/privacy` and `/terms` pages; this does not yet.
 
 ## Licensing
 
@@ -131,9 +182,8 @@ kept for misses and for danger.
 - **Vocabulary depth.** Only the Basics stage is authored, 40 words per deck.
   `Everyday` and `Fluent` are declared empty so the stage machinery has the
   shape it expects and the gap is visible in the data rather than at runtime.
-- **Accounts and sync.** No server. The data model is already shaped for one —
-  client-generated review ids, an append-only guard log, cards folded from
-  history — so it is a worker away, not a migration.
+- **Privacy and terms pages.** Needed before the Google consent screen can be
+  published.
 - **Multi-character phrases on the pad.** The pad writes one character at a
   time; the spec calls for phrase display, which needs a row of pads.
 - **Example sentences.** Vocabulario has one per word; this has none yet.

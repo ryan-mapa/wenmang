@@ -21,7 +21,6 @@
 // move the card past the learning steps.
 
 import { newCard, intervalFor, BOX_COUNT } from './srs.js';
-import { characterInfo } from './characters.js';
 
 export const MODES = ['teach', 'guided', 'free'];
 
@@ -69,74 +68,6 @@ export function suggestedMode(card = newCard()) {
   return 'free';
 }
 
-// The hint ladder. Each rung gives away strictly more than the one before, and
-// the early rungs deliberately give away *structure* rather than shape — how
-// long the character is, and what family it belongs to. That is the Wubi
-// insight applied without Wubi's data: a learner who is told "this is a 女
-// character with six strokes" usually recovers the rest themselves, and has
-// learned something reusable when they do. Being shown the next stroke teaches
-// them only that stroke.
-export const HINT_LEVELS = ['strokeCount', 'radical', 'outline', 'nextStroke'];
-
-/**
- * Build the hint at `level` for a character, or null past the end of the ladder.
- *
- * `reveals` names what the pad must do, so the renderer never has to interpret
- * the hint text. A character with no Unihan entry skips the structural rungs
- * rather than inventing them — there is no honest stroke count to give.
- */
-export function hintAt(char, level) {
-  const info = characterInfo(char);
-  const rung = HINT_LEVELS[level];
-
-  switch (rung) {
-    case 'strokeCount':
-      if (!info.strokes) return hintAt(char, level + 1);
-      return {
-        level,
-        rung,
-        text: `${info.strokes} strokes`,
-        reveals: 'nothing'
-      };
-
-    case 'radical':
-      if (!info.radical) return hintAt(char, level + 1);
-      if (info.isRadicalItself) {
-        return {
-          level,
-          rung,
-          text: `This one is the radical itself — ${info.radical.display}, ${info.radical.en}`,
-          reveals: 'nothing'
-        };
-      }
-      return {
-        level,
-        rung,
-        text: `Built on ${info.radical.display} (${info.radical.py}) — ${info.radical.en}`,
-        reveals: 'nothing'
-      };
-
-    case 'outline':
-      return {
-        level,
-        rung,
-        text: 'Showing the shape',
-        reveals: 'outline'
-      };
-
-    case 'nextStroke':
-      return {
-        level,
-        rung,
-        text: 'Showing the next stroke',
-        reveals: 'nextStroke'
-      };
-
-    default:
-      return null;
-  }
-}
-
 /** Fresh state for one attempt at one character. */
 export function newAttempt(char, mode = 'teach') {
   return {
@@ -179,16 +110,19 @@ export function isSuccess(attempt) {
 }
 
 /**
- * Fold an attempt into a character card.
+ * Advance a character card by one result.
  *
  * This is `srs.review` with the mode cap applied, and the cap is applied
  * *before* the interval is chosen rather than after — a card clamped to box 1
  * must come back on box 1's schedule, or it would sit unseen for two weeks
  * while claiming to be barely learned.
+ *
+ * Takes the outcome rather than the attempt, because history replayed from a
+ * server has only the outcome: what a device uploads is "this mode, this
+ * result", not the stroke-by-stroke record of how it went.
  */
-export function reviewCharacter(card, attempt, now) {
-  const success = isSuccess(attempt);
-  const cap = MODE_BOX_CAP[normalizeMode(attempt.mode)];
+export function applyResult(card, { mode, success }, now) {
+  const cap = MODE_BOX_CAP[normalizeMode(mode)];
   const box = success ? Math.min(card.box + 1, cap) : 0;
 
   return {
@@ -198,6 +132,35 @@ export function reviewCharacter(card, attempt, now) {
     correct: card.correct + (success ? 1 : 0),
     lastSeenAt: now
   };
+}
+
+/** Fold a finished attempt on the pad into a character card. */
+export function reviewCharacter(card, attempt, now) {
+  return applyResult(card, { mode: attempt.mode, success: isSuccess(attempt) }, now);
+}
+
+/**
+ * Rebuild a character card from its whole history.
+ *
+ * The counterpart of `srs.foldReviews`, and it exists separately for one
+ * reason: a character's box depends on the *mode* each attempt was made in, so
+ * replaying its history means replaying the caps too. Folding character history
+ * with the plain word fold would quietly promote a character somebody has only
+ * ever traced, which is the one thing the caps exist to prevent.
+ *
+ * Same two properties as the word fold, for the same reason — deterministic
+ * regardless of arrival order, and pure, so a server and a browser cannot drift
+ * about what a history means.
+ */
+export function foldCharacterReviews(entries, seed = newCard()) {
+  const ordered = [...entries].sort(
+    (a, b) => a.reviewedAt - b.reviewedAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  );
+  return ordered.reduce(
+    (card, entry) =>
+      applyResult(card, { mode: entry.mode, success: Boolean(entry.success) }, entry.reviewedAt),
+    seed
+  );
 }
 
 /**

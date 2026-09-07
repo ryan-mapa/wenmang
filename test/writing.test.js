@@ -2,17 +2,18 @@ import { describe, it, expect } from 'vitest';
 import {
   MODES,
   suggestedMode,
-  hintAt,
-  HINT_LEVELS,
   newAttempt,
   recordStroke,
   takeHint,
   isSuccess,
   reviewCharacter,
   capExplanation,
+  foldCharacterReviews,
+  applyResult,
   MISTAKE_ALLOWANCE,
   HINT_ALLOWANCE
 } from '../source/writing.js';
+import { hintAt, HINT_LEVELS } from '../source/hints.js';
 import { newCard, BOX_COUNT, isMastered, intervalFor } from '../source/srs.js';
 
 const completed = (char, mode, strokes) => {
@@ -154,5 +155,49 @@ describe('explaining a cap', () => {
 describe('modes', () => {
   it('has exactly the three the spec names', () => {
     expect(MODES).toEqual(['teach', 'guided', 'free']);
+  });
+});
+
+describe('folding a character history', () => {
+  const at = (id, reviewedAt, mode, success) => ({ id, reviewedAt, mode, success });
+
+  it('does not depend on the order the reviews arrive in', () => {
+    const entries = [
+      at('b', 2000, 'free', true),
+      at('a', 1000, 'free', true),
+      at('c', 3000, 'guided', true)
+    ];
+    expect(foldCharacterReviews(entries)).toEqual(foldCharacterReviews([...entries].reverse()));
+  });
+
+  it('breaks a same-millisecond tie the same way every time', () => {
+    const tied = [at('z', 1000, 'free', false), at('a', 1000, 'free', true)];
+    expect(foldCharacterReviews(tied)).toEqual(foldCharacterReviews([...tied].reverse()));
+  });
+
+  it('replays the mode caps rather than ignoring them', () => {
+    // The whole reason this fold exists. A history of nothing but tracing must
+    // not fold to a mastered character, however long it is.
+    const traced = Array.from({ length: 12 }, (_, i) => at(`t${i}`, 1000 + i, 'teach', true));
+    expect(foldCharacterReviews(traced).box).toBe(1);
+
+    const written = Array.from({ length: 12 }, (_, i) => at(`w${i}`, 1000 + i, 'free', true));
+    expect(isMastered(foldCharacterReviews(written))).toBe(true);
+  });
+
+  it('starts from a seed imported from a browser with no account', () => {
+    const seed = { ...newCard(), box: 3, seen: 9, correct: 9 };
+    expect(foldCharacterReviews([], seed)).toEqual(seed);
+  });
+
+  it('ends where replaying the attempts by hand would', () => {
+    const card = foldCharacterReviews([
+      at('a', 1000, 'free', true),
+      at('b', 2000, 'free', true),
+      at('c', 3000, 'free', false)
+    ]);
+    expect(card.box).toBe(0);
+    expect(card.seen).toBe(3);
+    expect(card.correct).toBe(2);
   });
 });

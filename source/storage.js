@@ -23,6 +23,15 @@ import { isMode } from './writing.js';
 export const VERSION = 1;
 
 const KEY = 'wenmang:v1';
+const OUTBOX_KEY = 'wenmang:outbox';
+const ROUND_OUTBOX_KEY = 'wenmang:rounds';
+
+/**
+ * How many unsent answers to keep. Reached only by playing offline for a very
+ * long time; past it the oldest go, because a bounded loss of history beats
+ * filling the origin's storage quota and losing the ability to save anything.
+ */
+const OUTBOX_LIMIT = 2000;
 
 /**
  * Days of history to keep. Two years of `{ day: rounds }` is a few kilobytes,
@@ -168,6 +177,7 @@ export function save(data) {
 export const withCards = (data, cards) => ({ ...data, cards });
 export const withChars = (data, chars) => ({ ...data, chars });
 export const withDays = (data, days) => ({ ...data, days: readDays(days) });
+export const withSyncedAt = (data, syncedAt) => ({ ...data, syncedAt: number(syncedAt, 0) });
 export const withPrefs = (data, prefs) => ({ ...data, prefs: readPrefs({ ...data.prefs, ...prefs }) });
 
 /** Add a guard change, or take in a merged set from elsewhere. */
@@ -180,6 +190,8 @@ export function reset() {
   const store = storage();
   try {
     store?.removeItem(KEY);
+    store?.removeItem(OUTBOX_KEY);
+    store?.removeItem(ROUND_OUTBOX_KEY);
   } catch {
     /* nothing to clear */
   }
@@ -233,4 +245,67 @@ export function parseProgress(text) {
     throw new Error('That code came from a newer version of Wenmang than this one.');
   }
   return readPayload(parsed);
+}
+
+/**
+ * Answers waiting to reach the server. Written on every answer, signed in or
+ * not: recording history from the start means somebody who signs in later
+ * brings real history with them instead of only a snapshot.
+ *
+ * A queued review names its `kind` — 'word' or 'char' — because the two fold by
+ * different rules on the server, and a character review carries the `mode` it
+ * was made in, without which the mode caps could not be replayed.
+ */
+function readQueue(key) {
+  const store = storage();
+  if (!store) return [];
+  const raw = readKey(store, key);
+  return Array.isArray(raw) ? raw : [];
+}
+
+function writeQueue(key, entries) {
+  const store = storage();
+  if (!store) return;
+  try {
+    store.setItem(key, JSON.stringify(entries.slice(-OUTBOX_LIMIT)));
+  } catch {
+    // Quota or blocked storage. Play carries on; this just will not sync.
+  }
+}
+
+const push = (key, entry) => writeQueue(key, [...readQueue(key), entry]);
+
+/** Drop the entries the server confirmed, keeping anything added meanwhile. */
+function drop(key, ids) {
+  const done = new Set(ids);
+  writeQueue(key, readQueue(key).filter((entry) => !done.has(entry.id)));
+}
+
+export const readOutbox = () => readQueue(OUTBOX_KEY);
+export const queueReview = (entry) => push(OUTBOX_KEY, entry);
+export const clearQueued = (ids) => drop(OUTBOX_KEY, ids);
+
+/** Finished rounds waiting to reach the server. What the streak is built from. */
+export const readRoundOutbox = () => readQueue(ROUND_OUTBOX_KEY);
+export const queueRound = (entry) => push(ROUND_OUTBOX_KEY, entry);
+export const clearQueuedRounds = (ids) => drop(ROUND_OUTBOX_KEY, ids);
+
+/**
+ * Local progress as import seeds, for a first sync from a browser that was
+ * played before it had an account.
+ *
+ * Sent as snapshots rather than as invented reviews: the browser never recorded
+ * how the progress was earned, and manufacturing a plausible history would be a
+ * lie every statistic built on the log would then repeat.
+ */
+export function importSeeds(data) {
+  return [
+    ...Object.entries(data.cards).map(([item, card]) => ({ kind: 'word', item, ...card })),
+    ...Object.entries(data.chars).map(([item, card]) => ({ kind: 'char', item, ...card }))
+  ];
+}
+
+/** Local day counts, for that same first sync. */
+export function dayHandover(data) {
+  return Object.entries(data.days).map(([localDay, rounds]) => ({ localDay, rounds }));
 }

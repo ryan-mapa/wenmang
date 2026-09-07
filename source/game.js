@@ -161,8 +161,25 @@ export function createGame({
     return state.question;
   }
 
+  /**
+   * Take in progress that arrived from somewhere else mid-round.
+   *
+   * A round works from its own copy of the cards, taken when it started.
+   * Without this, a sync landing mid-round would update the saved progress
+   * while the round carried on from the older copy — and the next answer would
+   * write that stale copy straight back over everything the sync brought in.
+   *
+   * Incoming cards win: they are the fold over every device's history. An
+   * answer of this round's that has not reached the server yet is folded in on
+   * the next sync, so a card that regresses here corrects itself.
+   */
+  function adoptCards(incoming) {
+    state.cards = { ...state.cards, ...incoming };
+  }
+
   return {
     state,
+    adoptCards,
     nextQuestion,
     answer,
     startRound,

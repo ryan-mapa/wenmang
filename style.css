@@ -531,6 +531,61 @@ kbd { background: var(--panel-hi); border: 1px solid var(--line); border-radius:
 .transfer-status.good { color: var(--jade); }
 .transfer-status.bad { color: var(--zhu); }
 
+/* ------------------------------------------------------------------ auth */
+
+/* Google's own button artwork and wording, unaltered — the whole value of the
+   standard button is that people recognise it on sight, so it deliberately does
+   not match the rest of the page. This is their dark theme, the sanctioned
+   variant for a ground like ours.
+   https://developers.google.com/identity/branding-guidelines */
+.auth { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+
+.google-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 14px 0 12px;
+  font: 500 13px/1 Roboto, system-ui, sans-serif;
+  color: #e3e3e3;
+  background: #131314;
+  border: 1px solid #8e918f;
+  border-radius: 18px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.google-btn:focus-visible { outline: 2px solid var(--jade); outline-offset: 2px; }
+.g-mark { width: 17px; height: 17px; flex: none; }
+
+.auth-user { display: flex; align-items: center; gap: 8px; }
+.auth-name { font-size: 13px; font-weight: 600; }
+.auth-note { margin: 0; font-size: 12px; color: var(--zhu); flex-basis: 100%; }
+
+/* Deleting an account is not a peer of the buttons above it, so it does not
+   look like one — it sits below the actions as plain text. */
+.account-danger-note {
+  margin: 18px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  text-align: center;
+  font-size: 12px;
+}
+.account-danger-note .linkish { color: var(--muted); }
+.account-danger-note .linkish:hover { color: var(--zhu); }
+
+.confirm-input {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 10px;
+}
+.confirm-input:focus { outline: none; border-color: var(--jade); }
+
 /* ------------------------------------------------------------ responsive */
 
 /* Phones: the vertical budget is the whole problem. Everything above the
@@ -541,7 +596,14 @@ kbd { background: var(--panel-hi); border: 1px solid var(--line); border-radius:
   body { padding: 14px 12px 24px; }
   .field-direction { min-width: 6.5rem; }
   .topbar { flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .auth { order: 1; }
   .settings { order: 2; flex-basis: 100%; }
+
+  /* Icon only: the label is what makes this button too wide for a phone, and
+     the four-colour G is the part people actually recognise. */
+  .google-btn { padding: 0; width: 36px; justify-content: center; }
+  .google-btn-label { display: none; }
+  .auth-name { display: none; }
   .wordmark { font-size: 22px; }
   .brand-mark { font-size: 22px; }
   .scoreboard { gap: 6px; margin-bottom: 10px; }
