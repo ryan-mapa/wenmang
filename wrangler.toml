@@ -20,9 +20,17 @@ workers_dev = false
 [assets]
 directory = "."
 
-# Stroke data is fetched from a CDN by the browser rather than served from here;
-# see source/strokes.js for why it is not vendored. So there is no bucket to
-# bind and nothing large in the asset upload.
+# The clips live in R2 rather than in static assets. There are about 7,000 of
+# them against a per-Worker asset limit around 20,000, and every deploy would
+# otherwise scan and re-upload the lot; R2 has no such limit and the audio stops
+# being redeployed at all. Bound to the Worker, so it still serves from this
+# origin — same URLs, no CORS.
+#
+# Stroke data is different again: the browser fetches that from a CDN, and
+# source/strokes.js explains why it is not vendored here.
+[[r2_buckets]]
+binding = "AUDIO"
+bucket_name = "wenmang-audio"
 
 [[routes]]
 pattern = "wenmang.ryan-mapa.dev"

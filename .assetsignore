@@ -19,3 +19,15 @@ wrangler.toml
 .assetsignore
 .gitignore
 .DS_Store
+
+# The clips are served from R2 by the Worker, not as static assets. Leaving them
+# here too would put ~7,000 files back against a ~20,000 limit — and static
+# assets are matched BEFORE the Worker runs, so the R2 route would never fire.
+#
+# Only the numbered voice directories. audio/words.json must stay: the manifest
+# is what tells the page which words have a speaker button, and excluding the
+# whole directory took it out with the clips.
+audio/1
+audio/2
+audio/3
+audio/4
