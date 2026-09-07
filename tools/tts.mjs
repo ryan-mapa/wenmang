@@ -43,7 +43,10 @@ const VOICES = [
 ];
 
 /** Pause between requests, so a long run does not trip Azure's rate limit. */
-const PACE_MS = Number(process.env.TTS_PACE_MS ?? 220);
+const PACE_MS = Number(process.env.TTS_PACE_MS ?? 400);
+
+/** Attempts per clip before giving up and leaving it for the next pass. */
+const ATTEMPTS = 4;
 
 // ---------------------------------------------------------------- arguments
 
@@ -84,26 +87,49 @@ function readEnv() {
 const escapeXml = (text) =>
   text.replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]));
 
+/**
+ * Synthesize one clip, retrying a throttle.
+ *
+ * Azure answers 429 under sustained load, and the first run of a deck hit it
+ * about a fifth of the time. The daemon around this would eventually pick those
+ * up on a later pass, but a retry here is both faster and cheaper than a whole
+ * extra pass — and it keeps "failed" meaning something is actually wrong rather
+ * than that we went too fast. Backoff honours Retry-After when Azure sends one.
+ */
 async function speak(vars, text, voice) {
   const ssml =
     `<speak version='1.0' xml:lang='zh-CN'>` +
     `<voice name='${voice}'>${escapeXml(text)}</voice></speak>`;
 
-  const res = await fetch(
-    `https://${vars.AZURE_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`,
-    {
-      method: 'POST',
-      headers: {
-        'Ocp-Apim-Subscription-Key': vars.AZURE_KEY,
-        'Content-Type': 'application/ssml+xml',
-        'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
-        'User-Agent': 'wenmang'
-      },
-      body: ssml
-    }
-  );
-  if (!res.ok) throw new Error(`azure ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  return Buffer.from(await res.arrayBuffer());
+  let lastError;
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    const res = await fetch(
+      `https://${vars.AZURE_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`,
+      {
+        method: 'POST',
+        headers: {
+          'Ocp-Apim-Subscription-Key': vars.AZURE_KEY,
+          'Content-Type': 'application/ssml+xml',
+          'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
+          'User-Agent': 'wenmang'
+        },
+        body: ssml
+      }
+    );
+    if (res.ok) return Buffer.from(await res.arrayBuffer());
+
+    lastError = new Error(`azure ${res.status}: ${(await res.text()).slice(0, 200)}`);
+
+    // Only a throttle or a server-side wobble is worth retrying. A 401 will
+    // fail identically four times, and doing so just delays the real message.
+    if (res.status !== 429 && res.status < 500) throw lastError;
+    if (attempt === ATTEMPTS) break;
+
+    const after = Number(res.headers.get('retry-after'));
+    const wait = Number.isFinite(after) && after > 0 ? after * 1000 : 800 * 2 ** (attempt - 1);
+    await new Promise((r) => setTimeout(r, wait));
+  }
+  throw lastError;
 }
 
 async function listVoices(vars) {
