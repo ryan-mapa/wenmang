@@ -36,7 +36,12 @@ function bare(pinyin) {
     .normalize('NFD')
     .replace(/[\u0300-\u030f]/g, '')   // combining tone marks
     .replace(/\u00fc/g, 'v')
-    .replace(/[''\u2019\s-]/g, '')
+    // Everything that is not a letter goes: whitespace and the apostrophe that
+    // separates syllables (xī'ān), but also the punctuation a *sentence* has
+    // and a word does not. A comma left in the pinyin lines up with nothing on
+    // the Chinese side, where only Han characters are read, so every sentence
+    // with a clause break failed to align.
+    .replace(/[^\p{L}]/gu, '')
     .toLowerCase();
 }
 
@@ -105,13 +110,23 @@ function align(chars, syllablesOf, index = 0, at = 0) {
   const options = readings.get(chars[index]);
   if (!options) return null;
 
-  // Erhua. A final 儿 is not a syllable of its own — it colours the syllable
-  // before it, so 哪儿 is nǎr and not nǎ ér. One character has no syllable to
-  // line up with, which is exactly what the rest of this function forbids, so
-  // it is spelled out here rather than smuggled in as a reading.
-  if (chars[index] === '儿' && index === chars.length - 1) {
-    const tail = syllablesOf.bare.slice(at);
-    if (tail === 'r' || tail === '') return true;
+  // Erhua. A suffixed 儿 is not a syllable of its own — it colours the syllable
+  // before it, so 哪儿 is nǎr and 有点儿高 is yǒudiǎnr gāo. The character has no
+  // syllable to line up with, which is exactly what the rest of this function
+  // forbids, so it is spelled out here rather than smuggled in as a reading.
+  //
+  // It can fall anywhere but the start, not only at the end, and the colouring
+  // r is sometimes written and sometimes not. Both are tried, and both fall
+  // through to the readings below if the rest of the sentence does not align —
+  // 儿 is also a word in its own right (ér, child), and a sentence that uses it
+  // that way has to still be checkable.
+  if (chars[index] === '儿' && index > 0) {
+    for (const skip of [1, 0]) {
+      if (skip === 1 && syllablesOf.bare[at] !== 'r') continue;
+      const rest = align(chars, syllablesOf, index + 1, at + skip);
+      if (rest === true) return true;
+      if (rest === null) return null;
+    }
   }
 
   for (const reading of options) {
