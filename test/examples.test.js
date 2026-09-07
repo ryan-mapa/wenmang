@@ -4,6 +4,12 @@ import { SENTENCES } from '../source/sentences.js';
 import { allWords } from '../source/vocab.js';
 
 const pair = { zh: '请给我一杯水。', py: 'qǐng gěi wǒ yì bēi shuǐ', en: 'Please give me a glass of water.' };
+
+// A word that will never have a sentence, because it is not a word. Naming a
+// real headword here couples the test to how far the sentence-writing has got:
+// these two assertions used 蝴蝶, and broke the day the Animals deck was filled
+// in — a green suite turning red on new *content* rather than new code.
+const UNWRITTEN = '\u9c25\u9c25';
 const langs = (...args) => exampleLines(...args).map((line) => line.lang);
 
 describe('reading a sentence', () => {
@@ -13,7 +19,7 @@ describe('reading a sentence', () => {
   });
 
   it('returns null for a word with none', () => {
-    expect(exampleFor(SENTENCES, '蝴蝶')).toBeNull();
+    expect(exampleFor(SENTENCES, UNWRITTEN)).toBeNull();
   });
 
   it('returns null rather than a partial entry', () => {
@@ -82,7 +88,7 @@ describe('what may be shown after answering', () => {
 
 describe('whether there is anything to offer', () => {
   it('is false for a word with no sentence', () => {
-    expect(hasExample(SENTENCES, { zh: '蝴蝶' }, 'zh-en', 'hanzi')).toBe(false);
+    expect(hasExample(SENTENCES, { zh: UNWRITTEN }, 'zh-en', 'hanzi')).toBe(false);
   });
 
   it('is true in both directions and every script for a word that has one', () => {
