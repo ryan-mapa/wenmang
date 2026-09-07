@@ -1,93 +1,217 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>文盲 Wenmang — Mandarin words and characters</title>
-  <meta name="description" content="Learn Mandarin vocabulary and how to write the characters by hand, with spaced repetition.">
-  <link rel="stylesheet" href="style.css">
+  <meta name="description" content="Learn Mandarin vocabulary and how to write the characters by hand, with spaced repetition." />
+  <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.7.3/dist/hanzi-writer.min.js" defer></script>
 </head>
 <body>
-  <header class="bar">
-    <h1 class="wordmark"><span class="hanzi">文盲</span> <span class="latin">Wenmang</span></h1>
-    <div class="bar-tools">
-      <span class="streak" id="streak" title="Day streak"></span>
-      <button class="icon-toggle" id="script-toggle" type="button" title="Change what is shown"></button>
-      <span class="share-note" id="share-note" role="status" aria-live="polite"></span>
-      <button class="icon-toggle" id="share" type="button" aria-label="Share this app" title="Share this app">↗</button>
-    </div>
-  </header>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <!-- Inline rather than an <img>, so the mark takes the page's colors.
+             A 田字格 with a brush stroke through it: the practice square every
+             Chinese exercise book is ruled with. -->
+        <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+          <defs>
+            <linearGradient id="wmark" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#2f9fb5"/>
+              <stop offset="1" stop-color="#4fbf8b"/>
+            </linearGradient>
+          </defs>
+          <rect x="7" y="7" width="50" height="50" rx="7" fill="none" stroke="#26343a" stroke-width="3"/>
+          <path d="M32 7v50M7 32h50" stroke="#26343a" stroke-width="1.5" stroke-dasharray="4 4"/>
+          <path d="M19 21 Q32 34 27 47" fill="none" stroke="url(#wmark)" stroke-width="8" stroke-linecap="round"/>
+          <path d="M30 25 L46 41" fill="none" stroke="url(#wmark)" stroke-width="7" stroke-linecap="round"/>
+        </svg>
+        <h1 class="wordmark" translate="no">文盲</h1>
+        <span class="wordmark-latin">Wenmang</span>
+      </div>
 
-  <!-- Home -->
-  <main class="screen" id="screen-home">
-    <section class="goal">
-      <div class="goal-meter"><div class="goal-fill" id="goal-fill"></div></div>
-      <p class="goal-text" id="goal-text"></p>
+      <div class="settings">
+        <label class="field field-deck">
+          <span>Deck</span>
+          <select id="deck" translate="no"></select>
+        </label>
+        <label class="field field-direction" id="direction-field">
+          <span>Direction</span>
+          <select id="direction" translate="no">
+            <option value="mixed" data-full="Mixed (recommended)" data-short="Mixed">Mixed (recommended)</option>
+            <option value="zh-en">中文 → English</option>
+            <option value="en-zh">English → 中文</option>
+          </select>
+        </label>
+
+        <button class="chip-toggle" id="script-toggle" type="button" title="Change what is shown">
+          <span id="script-label" translate="no">汉字</span>
+        </button>
+
+        <button class="shield" id="guard-shield" type="button" title="Streak guard">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M12 3 5 5.6v5.7c0 4.3 3 8.3 7 9.4 4-1.1 7-5.1 7-9.4V5.6L12 3z"/>
+          </svg>
+          <span class="shield-label">Streak guard</span>
+        </button>
+      </div>
+    </header>
+
+    <section class="scoreboard" aria-label="Progress">
+      <div class="stat" id="today-stat" tabindex="0"
+           data-tip="Rounds you have finished today. Five meets the daily goal — about ten minutes. Word rounds and character rounds both count.">
+        <span class="stat-value" id="today">0/5</span><span class="stat-label">today</span>
+        <span class="stat-fill" id="goal-fill"></span>
+      </div>
+      <button class="stat" id="streak-stat" type="button"
+              data-tip="Days in a row you have met the goal. It survives up to three missed days — click for streak guard.">
+        <span class="stat-value" id="streak">0</span>
+        <span class="stat-label">streak</span>
+        <span class="guard-badge" id="guard-badge" aria-hidden="true"></span>
+      </button>
+      <div class="stat" tabindex="0" id="mastered-stat"
+           data-tip="Words in this deck and stage you have reached the top box on — four correct answers in a row, with no miss in between.">
+        <span class="stat-value" id="mastered">0</span><span class="stat-label">mastered</span>
+      </div>
+      <div class="stat" tabindex="0" id="mastery-stat"
+           data-tip="How far this deck and stage has climbed overall, counting partial progress on every word — not only the mastered ones.">
+        <span class="stat-value" id="mastery">0%</span><span class="stat-label">mastery</span>
+      </div>
     </section>
 
-    <section class="picker">
-      <h2>Practise</h2>
-      <div class="round-types" id="round-types" role="group" aria-label="Round type"></div>
-      <p class="locked-note" id="locked-note"></p>
+    <p class="scoreboard-note" id="scoreboard-note" role="status" aria-live="polite"></p>
+
+    <div class="progress" aria-hidden="true"><div class="progress-fill" id="round-progress"></div></div>
+
+    <!-- What kind of round. Words are always open; characters unlock from the
+         words you have mastered. -->
+    <section class="practice" aria-label="Practice">
+      <div class="practice-row" id="practice-row" role="group" aria-label="Round type"></div>
     </section>
 
-    <section class="picker" id="deck-section">
-      <h2>Decks</h2>
-      <div class="decks" id="decks"></div>
+    <section class="stages" id="stages" aria-label="Stage">
+      <div class="stage-row" id="stage-row" role="group" aria-label="Choose a stage"></div>
+      <p class="unlock-note" id="unlock-note"></p>
     </section>
 
-    <section class="picker" id="writing-section" hidden>
-      <h2>Writing</h2>
-      <div class="modes" id="mode-picker" role="group" aria-label="Writing mode"></div>
-      <p class="hint-note" id="mode-note"></p>
-      <button class="primary" id="start-characters" type="button">Start a character round</button>
+    <section class="stages" id="writing-modes" aria-label="Writing mode" hidden>
+      <div class="mode-row" id="mode-row" role="group" aria-label="Choose a writing mode"></div>
+      <p class="unlock-note" id="mode-note"></p>
     </section>
-  </main>
 
-  <!-- Word round -->
-  <main class="screen" id="screen-words" hidden>
-    <div class="progress"><div class="progress-fill" id="word-progress"></div></div>
-    <section class="prompt">
-      <p class="prompt-main" id="prompt-main"></p>
-      <p class="prompt-sub" id="prompt-sub"></p>
+    <!-- Word question -->
+    <section class="card" id="play">
+      <p class="direction-hint" id="direction-hint">What does it mean…?</p>
+      <div class="prompt-row">
+        <p class="prompt" id="prompt" translate="no">—</p>
+        <p class="prompt-sub" id="prompt-sub" translate="no"></p>
+      </div>
+      <div class="choices" id="choices" translate="no"></div>
+      <p class="feedback" id="feedback" role="status" aria-live="polite" translate="no">&nbsp;</p>
+      <p class="hint" id="hint">Answer with <kbd>1</kbd>–<kbd>4</kbd> · <kbd>Enter</kbd> to continue</p>
     </section>
-    <div class="choices" id="choices"></div>
-    <p class="feedback" id="word-feedback" role="status" aria-live="polite"></p>
-  </main>
 
-  <!-- Character round -->
-  <main class="screen" id="screen-chars" hidden>
-    <div class="progress"><div class="progress-fill" id="char-progress"></div></div>
-    <section class="char-head">
+    <!-- Character writing -->
+    <section class="card" id="write" hidden>
+      <p class="direction-hint" id="write-hint">Write it…</p>
       <p class="char-gloss" id="char-gloss"></p>
-      <p class="char-context" id="char-context"></p>
+      <p class="char-context" id="char-context" translate="no"></p>
+      <div class="pad-wrap">
+        <div class="pad-grid" aria-hidden="true"></div>
+        <div class="pad" id="pad"></div>
+      </div>
+      <p class="feedback" id="char-feedback" role="status" aria-live="polite"></p>
+      <div class="char-tools">
+        <button class="ghost" id="char-hint-btn" type="button">Hint</button>
+        <button class="ghost" id="show-again" type="button">Show it again</button>
+        <button class="ghost" id="skip" type="button">Skip</button>
+      </div>
+      <p class="hint" id="write-keys">Draw on the square · <kbd>H</kbd> for a hint</p>
     </section>
-    <div class="pad-wrap">
-      <div class="pad-grid" aria-hidden="true"></div>
-      <div class="pad" id="pad"></div>
-    </div>
-    <p class="hint-note" id="char-hint" role="status" aria-live="polite"></p>
-    <div class="char-tools">
-      <button id="hint" type="button">Hint</button>
-      <button id="show-again" type="button">Show it again</button>
-      <button id="skip" type="button">Skip</button>
-    </div>
-    <p class="mode-badge" id="char-mode"></p>
-  </main>
 
-  <!-- Results -->
-  <main class="screen" id="screen-done" hidden>
-    <h2 class="done-title" id="done-title"></h2>
-    <p class="done-line" id="done-line"></p>
-    <p class="done-line muted" id="done-unlocked"></p>
-    <button class="primary" id="again" type="button">Again</button>
-    <button id="home" type="button">Back</button>
-  </main>
+    <section class="card summary" id="summary" hidden>
+      <p class="goal-banner" id="goal-banner" hidden></p>
+      <p class="unlock-banner" id="unlock-banner" hidden></p>
+      <h2 id="summary-title">Round complete!</h2>
+      <p class="summary-score"><span id="summary-accuracy">0%</span> correct</p>
+      <ul class="summary-list">
+        <li><span id="summary-today">0/5</span> rounds today</li>
+        <li><span id="summary-mastered">0</span> <span id="summary-mastered-label">words mastered</span></li>
+        <li>Longest streak: <span id="summary-longest">0</span> days</li>
+      </ul>
+      <button class="primary" id="again" type="button">Play again</button>
+    </section>
 
-  <footer class="foot">
-    <span id="attribution"></span>
-  </footer>
+    <footer class="footer">
+      <span class="footer-links">
+        <button class="linkish" id="open-transfer" type="button">Move progress</button>
+      </span>
+      <div class="footer-actions">
+        <span class="share-note" id="share-note" role="status" aria-live="polite"></span>
+        <button class="icon-toggle" id="share" type="button" aria-label="Share this app" title="Share this app">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle class="node" cx="18" cy="5" r="2.6"/>
+            <circle class="node" cx="6" cy="12" r="2.6"/>
+            <circle class="node" cx="18" cy="19" r="2.6"/>
+            <path class="link" d="M8.3 10.8 15.7 6.6M8.3 13.2l7.4 4.2"/>
+          </svg>
+        </button>
+      </div>
+      <p class="attribution" id="attribution"></p>
+    </footer>
+
+    <dialog class="confirm" id="guard-notice" aria-labelledby="guard-notice-title">
+      <h2 id="guard-notice-title"></h2>
+      <p class="confirm-body" id="guard-notice-body"></p>
+      <div class="confirm-actions">
+        <button class="primary" id="guard-notice-ok" type="button" autofocus>Got it</button>
+      </div>
+    </dialog>
+
+    <dialog class="confirm" id="guard-dialog" aria-labelledby="guard-title">
+      <h2 id="guard-title">Streak guard</h2>
+      <p class="confirm-body" id="guard-body"></p>
+      <p class="confirm-body guard-explainer">
+        Turn this on before a holiday, or any stretch you know you will miss,
+        and your streak is held instead of running down. It stays on until you
+        turn it off — or until you finish a round, which picks the streak up
+        again by itself.
+      </p>
+      <div class="confirm-actions">
+        <button class="ghost" id="guard-close" type="button" autofocus>Close</button>
+        <button class="primary" id="guard-toggle" type="button"></button>
+      </div>
+    </dialog>
+
+    <dialog class="confirm transfer" id="transfer-dialog" aria-labelledby="transfer-title">
+      <h2 id="transfer-title">Move progress</h2>
+      <p class="confirm-body">
+        Progress is saved in this browser alone. Copy this code to carry it to
+        another browser, another device, or a new address for this app. It holds
+        both your words and your handwriting.
+      </p>
+
+      <label class="transfer-field">
+        <span>Your progress code</span>
+        <textarea id="transfer-out" rows="4" readonly spellcheck="false" translate="no"></textarea>
+      </label>
+      <div class="confirm-actions">
+        <button class="ghost" id="transfer-copy" type="button">Copy</button>
+      </div>
+
+      <label class="transfer-field">
+        <span>Paste a code to restore</span>
+        <textarea id="transfer-in" rows="4" spellcheck="false" translate="no" placeholder="Paste a progress code here…"></textarea>
+      </label>
+      <p class="transfer-status" id="transfer-status" role="status" aria-live="polite"></p>
+
+      <div class="confirm-actions">
+        <button class="ghost" id="transfer-close" type="button" autofocus>Close</button>
+        <button class="danger" id="transfer-import" type="button">Replace my progress</button>
+      </div>
+    </dialog>
+  </main>
 
   <script type="module" src="main.js"></script>
 </body>

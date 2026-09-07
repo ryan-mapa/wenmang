@@ -1,178 +1,347 @@
 // Wenmang. Screen wiring and round flow; every rule it enforces lives in
 // source/ so it can be tested without a browser.
 
-import { DECKS, ALL_DECK_ID } from './source/vocab.js';
-import { newCard, isMastered, review } from './source/srs.js';
+import { DECKS, ALL_DECK_ID, STAGE_NAMES, STAGE_COUNT, getDeck } from './source/vocab.js';
+import { newCard, isMastered, masteryOf } from './source/srs.js';
+import { createGame, MIXED, ROUND_LENGTH } from './source/game.js';
+import { DIRECTIONS } from './source/quiz.js';
+import { isStageUnlocked, stageProgress, unlockedDepth, nextUnlock } from './source/stages.js';
 import * as store from './source/storage.js';
-import { localDay, streakFrom, recordRound, goalProgress, DAILY_GOAL } from './source/goals.js';
+import {
+  localDay, streakFrom, recordRound, DAILY_GOAL, GRACE_DAYS, GUARD, guardEvent, manualGuardOn
+} from './source/goals.js';
 import { cycleScript, SCRIPT_LABELS, SCRIPT_DESCRIPTIONS, displayWord } from './source/script.js';
-import { isCorrect } from './source/quiz.js';
-import { buildWordRound, buildCharacterRound, availableRounds, ROUND_LABELS } from './source/rounds.js';
+import { buildCharacterRound, availableRounds, CHARACTER_ROUND_LENGTH } from './source/rounds.js';
 import { availableCharacters, characterInfo } from './source/characters.js';
 import {
-  MODES,
-  MODE_LABELS,
-  MODE_DESCRIPTIONS,
-  newAttempt,
-  recordStroke,
-  takeHint,
-  reviewCharacter,
-  isSuccess,
-  hintAt,
-  HINT_LEVELS,
-  capExplanation
+  MODES, MODE_LABELS, MODE_DESCRIPTIONS, newAttempt, recordStroke, takeHint,
+  reviewCharacter, isSuccess, hintAt, HINT_LEVELS, capExplanation
 } from './source/writing.js';
 import { loadCharacter, writerOptions, demonstratesFirst, ATTRIBUTION } from './source/strokes.js';
 
 const el = (id) => document.getElementById(id);
 
 const ui = {
-  screens: {
-    home: el('screen-home'),
-    words: el('screen-words'),
-    chars: el('screen-chars'),
-    done: el('screen-done')
-  },
-  streak: el('streak'),
+  deck: el('deck'),
+  direction: el('direction'),
+  directionField: el('direction-field'),
   scriptToggle: el('script-toggle'),
-  share: el('share'),
-  shareNote: el('share-note'),
+  scriptLabel: el('script-label'),
+  guardShield: el('guard-shield'),
+  guardBadge: el('guard-badge'),
+
+  today: el('today'),
+  todayStat: el('today-stat'),
   goalFill: el('goal-fill'),
-  goalText: el('goal-text'),
-  roundTypes: el('round-types'),
-  lockedNote: el('locked-note'),
-  deckSection: el('deck-section'),
-  decks: el('decks'),
-  writingSection: el('writing-section'),
-  modePicker: el('mode-picker'),
+  streak: el('streak'),
+  mastered: el('mastered'),
+  masteredStat: el('mastered-stat'),
+  mastery: el('mastery'),
+  masteryStat: el('mastery-stat'),
+  scoreboardNote: el('scoreboard-note'),
+  roundProgress: el('round-progress'),
+
+  practiceRow: el('practice-row'),
+  stages: el('stages'),
+  stageRow: el('stage-row'),
+  unlockNote: el('unlock-note'),
+  writingModes: el('writing-modes'),
+  modeRow: el('mode-row'),
   modeNote: el('mode-note'),
-  startCharacters: el('start-characters'),
-  wordProgress: el('word-progress'),
-  promptMain: el('prompt-main'),
+
+  play: el('play'),
+  directionHint: el('direction-hint'),
+  prompt: el('prompt'),
   promptSub: el('prompt-sub'),
   choices: el('choices'),
-  wordFeedback: el('word-feedback'),
-  charProgress: el('char-progress'),
+  feedback: el('feedback'),
+  hint: el('hint'),
+
+  write: el('write'),
+  writeHint: el('write-hint'),
   charGloss: el('char-gloss'),
   charContext: el('char-context'),
   pad: el('pad'),
-  charHint: el('char-hint'),
-  charMode: el('char-mode'),
-  hint: el('hint'),
+  charFeedback: el('char-feedback'),
+  charHintBtn: el('char-hint-btn'),
   showAgain: el('show-again'),
   skip: el('skip'),
-  doneTitle: el('done-title'),
-  doneLine: el('done-line'),
-  doneUnlocked: el('done-unlocked'),
+  writeKeys: el('write-keys'),
+
+  summary: el('summary'),
+  summaryTitle: el('summary-title'),
+  goalBanner: el('goal-banner'),
+  unlockBanner: el('unlock-banner'),
+  summaryAccuracy: el('summary-accuracy'),
+  summaryToday: el('summary-today'),
+  summaryMastered: el('summary-mastered'),
+  summaryMasteredLabel: el('summary-mastered-label'),
+  summaryLongest: el('summary-longest'),
   again: el('again'),
-  home: el('home'),
-  attribution: el('attribution')
+
+  share: el('share'),
+  shareNote: el('share-note'),
+  attribution: el('attribution'),
+  openTransfer: el('open-transfer'),
+
+  guardNotice: el('guard-notice'),
+  guardNoticeTitle: el('guard-notice-title'),
+  guardNoticeBody: el('guard-notice-body'),
+  guardNoticeOk: el('guard-notice-ok'),
+  guardDialog: el('guard-dialog'),
+  guardBody: el('guard-body'),
+  guardToggle: el('guard-toggle'),
+  guardClose: el('guard-close'),
+
+  transferDialog: el('transfer-dialog'),
+  transferOut: el('transfer-out'),
+  transferIn: el('transfer-in'),
+  transferStatus: el('transfer-status'),
+  transferCopy: el('transfer-copy'),
+  transferImport: el('transfer-import'),
+  transferClose: el('transfer-close')
 };
 
 let data = store.load();
 
-/** What the home screen is currently set to launch. */
+/** 'words' or 'characters'. */
 let roundType = 'words';
-let deckId = DECKS[0].id;
-/** null means "follow each card", the setting that walks a learner up the ladder. */
+/** Which stages a word round draws from — multi-select, so Basics and Everyday
+ *  can be studied together rather than one or the other. */
+let stages = [0];
+/** null means "follow each card", the only setting that climbs the mode ladder. */
 let preferredMode = null;
 
-/** The round in progress, of whichever kind. */
-let round = null;
+let game = null;
+let charRound = null;
+let writer = null;
 
-// ---------------------------------------------------------------- screens
-
-function show(name) {
-  for (const [key, node] of Object.entries(ui.screens)) node.hidden = key !== name;
-}
+let roundCredited = false;
+let depthAtRoundStart = 0;
+let hoveredTip = null;
 
 const persist = () => store.save(data);
+const cards = () => (game ? game.state.cards : data.cards);
 
-// ---------------------------------------------------------------- home
+// ------------------------------------------------------------------ chrome
 
-function renderGoal() {
+function populateDecks() {
+  const selected = ui.deck.value || DECKS[0].id;
+  const entries = [...DECKS, { id: ALL_DECK_ID, name: 'Everything', emoji: '全' }];
+
+  ui.deck.replaceChildren(
+    ...entries.map((deck) => {
+      const option = document.createElement('option');
+      option.value = deck.id;
+      const total = deck.id === ALL_DECK_ID
+        ? DECKS.reduce((n, d) => n + d.stages.flat().length, 0)
+        : deck.stages.flat().length;
+      const done = wordsOf(deck.id).filter((word) => isMastered(data.cards[word.zh] ?? newCard())).length;
+      option.textContent = `${deck.emoji} ${deck.name} · ${done}/${total}`;
+      return option;
+    })
+  );
+  ui.deck.value = selected;
+}
+
+function wordsOf(deckId) {
+  if (deckId === ALL_DECK_ID) return DECKS.flatMap((deck) => deck.stages.flat());
+  return getDeck(deckId)?.stages.flat() ?? [];
+}
+
+function renderScriptToggle() {
+  ui.scriptLabel.textContent = SCRIPT_LABELS[data.prefs.script];
+  ui.scriptToggle.title = SCRIPT_DESCRIPTIONS[data.prefs.script];
+}
+
+// -------------------------------------------------------------- scoreboard
+
+function renderScoreboard() {
   const today = localDay();
   const streak = streakFrom(data.days, today, data.guards);
 
-  ui.goalFill.style.width = `${goalProgress(data.days, today) * 100}%`;
-  ui.goalText.textContent = streak.hitToday
-    ? `Today is done — ${streak.roundsToday} rounds.`
-    : `${streak.roundsToday} of ${DAILY_GOAL} rounds today.`;
+  ui.today.textContent = `${streak.roundsToday}/${DAILY_GOAL}`;
+  ui.goalFill.style.width = `${Math.min(1, streak.roundsToday / DAILY_GOAL) * 100}%`;
+  ui.todayStat.classList.toggle('met', streak.hitToday);
 
-  ui.streak.textContent = streak.current > 0 ? `${streak.current}日` : '';
-  ui.streak.title = streak.current > 0 ? `${streak.current}-day streak` : '';
+  ui.streak.textContent = streak.current;
+  ui.streak.classList.toggle('lit', streak.current > 0);
+  ui.guardBadge.textContent = streak.guard === GUARD.GUARDED ? '●' : '';
+  ui.guardShield.classList.toggle('on', streak.guard === GUARD.GUARDED);
+
+  // The two right-hand tiles report whichever skill is being practised. In a
+  // writing round "mastered words" is not the number anybody is watching.
+  if (roundType === 'characters') {
+    const unlocked = availableCharacters(data.cards).map((entry) => entry.char);
+    const charCards = unlocked.map((char) => data.chars[char] ?? newCard());
+    ui.mastered.textContent = charCards.filter(isMastered).length;
+    ui.mastery.textContent = `${Math.round(masteryOf(charCards) * 100)}%`;
+    ui.masteredStat.dataset.tip =
+      'Characters you can write from a blank pad — the top box, which tracing cannot reach.';
+    ui.masteryStat.dataset.tip =
+      'How far your unlocked characters have climbed overall, counting partial progress on every one.';
+  } else {
+    const pool = poolWords();
+    const wordCards = pool.map((word) => data.cards[word.zh] ?? newCard());
+    ui.mastered.textContent = wordCards.filter(isMastered).length;
+    ui.mastery.textContent = `${Math.round(masteryOf(wordCards) * 100)}%`;
+    ui.masteredStat.dataset.tip =
+      'Words in this deck and stage you have reached the top box on — four correct answers in a row, with no miss in between.';
+    ui.masteryStat.dataset.tip =
+      'How far this deck and stage has climbed overall, counting partial progress on every word — not only the mastered ones.';
+  }
+
+  renderNote(streak);
 }
 
-function renderRoundTypes() {
+/** The words the current deck and stage selection covers. */
+function poolWords() {
+  const deckId = ui.deck.value || DECKS[0].id;
+  const open = stages.filter((stage) => isStageUnlocked(deckId, stage, data.cards));
+  const seen = new Set();
+  const out = [];
+  for (const stage of open.length ? open : [0]) {
+    for (const word of (deckId === ALL_DECK_ID
+      ? DECKS.flatMap((d) => d.stages[stage] ?? [])
+      : getDeck(deckId)?.stages[stage] ?? [])) {
+      if (seen.has(word.zh)) continue;
+      seen.add(word.zh);
+      out.push(word);
+    }
+  }
+  return out;
+}
+
+/**
+ * The line under the scoreboard. A hovered tile explains itself; otherwise the
+ * line is used for the one thing worth interrupting for, which is a streak
+ * inside its grace window.
+ */
+function renderNote(streak = streakFrom(data.days, localDay(), data.guards)) {
+  const note = ui.scoreboardNote;
+
+  if (hoveredTip) {
+    note.textContent = hoveredTip;
+    note.className = 'scoreboard-note';
+    return;
+  }
+
+  const atRisk =
+    streak.current > 0 && !streak.hitToday && streak.graceDaysLeft < GRACE_DAYS &&
+    streak.guard !== GUARD.GUARDED;
+
+  if (atRisk) {
+    note.innerHTML =
+      `Your <strong>${streak.current}-day</strong> streak has ` +
+      `<strong>${streak.graceDaysLeft}</strong> day${streak.graceDaysLeft === 1 ? '' : 's'} ` +
+      `of grace left — finish a round, or <button class="linkish" data-open-guard>pause it</button>.`;
+    note.className = 'scoreboard-note warning';
+    return;
+  }
+
+  note.textContent = '';
+  note.className = 'scoreboard-note';
+}
+
+// ------------------------------------------------------- practice / stages
+
+function renderPracticeRow() {
   const open = availableRounds(data.cards);
   if (!open.includes(roundType)) roundType = 'words';
 
-  ui.roundTypes.replaceChildren(
-    ...['words', 'characters'].map((type) => {
-      const button = document.createElement('button');
-      const unlocked = open.includes(type);
-      button.type = 'button';
-      button.disabled = !unlocked;
-      button.setAttribute('aria-pressed', String(type === roundType));
-      button.innerHTML =
-        `${ROUND_LABELS[type]}<small>${type === 'words' ? '20 questions' : '10 characters'}</small>`;
-      button.addEventListener('click', () => {
-        roundType = type;
-        renderHome();
-      });
-      return button;
-    })
-  );
-
   const unlocked = availableCharacters(data.cards).length;
-  ui.lockedNote.textContent = unlocked
-    ? `${unlocked} character${unlocked === 1 ? '' : 's'} unlocked by words you have mastered.`
-    : 'Character practice opens as you master words — each one unlocks the characters it contains.';
 
-  ui.deckSection.hidden = roundType !== 'words';
-  ui.writingSection.hidden = roundType !== 'characters';
-}
-
-function renderDecks() {
-  ui.decks.replaceChildren(
-    ...[...DECKS, { id: ALL_DECK_ID, name: 'Everything', emoji: '全' }].map((deck) => {
-      const words = deck.id === ALL_DECK_ID
-        ? DECKS.flatMap((d) => d.stages[0])
-        : deck.stages[0];
-      const cards = words.map((word) => data.cards[word.zh] ?? newCard());
-      const done = cards.filter(isMastered).length;
-
+  ui.practiceRow.replaceChildren(
+    ...[
+      { id: 'words', name: 'Words', meta: `${ROUND_LENGTH} questions` },
+      {
+        id: 'characters',
+        name: 'Characters',
+        meta: unlocked ? `${CHARACTER_ROUND_LENGTH} to write · ${unlocked} unlocked` : 'master a word to open'
+      }
+    ].map((type) => {
       const button = document.createElement('button');
-      button.className = 'deck';
       button.type = 'button';
+      button.disabled = !open.includes(type.id);
+      button.setAttribute('aria-pressed', String(type.id === roundType));
       button.innerHTML =
-        `<span class="emoji">${deck.emoji}</span>` +
-        `<span><span class="name">${deck.name}</span><br>` +
-        `<span class="meta">${done}/${words.length} mastered</span></span>`;
+        `<span class="practice-name">${type.name}</span><span class="practice-meta">${type.meta}</span>`;
       button.addEventListener('click', () => {
-        deckId = deck.id;
-        startWordRound();
+        if (type.id === roundType) return;
+        roundType = type.id;
+        startRound();
       });
       return button;
     })
   );
+
+  ui.stages.hidden = roundType !== 'words';
+  ui.writingModes.hidden = roundType !== 'characters';
+  ui.directionField.hidden = roundType !== 'words';
 }
 
-function renderModePicker() {
-  const options = [{ id: null, label: 'Follow my progress', note: 'Each character opens where it has earned' }]
-    .concat(MODES.map((mode) => ({ id: mode, label: MODE_LABELS[mode], note: MODE_DESCRIPTIONS[mode] })));
+function renderStages() {
+  const deckId = ui.deck.value || DECKS[0].id;
 
-  ui.modePicker.replaceChildren(
+  ui.stageRow.replaceChildren(
+    ...Array.from({ length: STAGE_COUNT }, (_, stage) => {
+      const info = stageProgress(deckId, stage, data.cards);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'stage';
+      button.disabled = !info.unlocked || info.total === 0;
+      button.setAttribute('aria-pressed', String(stages.includes(stage) && info.unlocked));
+      button.innerHTML =
+        `<span class="stage-name">${STAGE_NAMES[stage]}</span>` +
+        `<span class="stage-meta">${info.total === 0 ? 'empty' : `${info.mastered}/${info.total}`}</span>` +
+        `<span class="stage-fill" style="width:${info.mastery * 100}%"></span>`;
+      button.addEventListener('click', () => toggleStage(stage));
+      return button;
+    })
+  );
+
+  const next = nextUnlock(deckId, data.cards);
+  ui.unlockNote.innerHTML = next
+    ? `<strong>${STAGE_NAMES[next.stage]}</strong> opens at ` +
+      `<strong>${Math.round(next.threshold * 100)}%</strong> of ${STAGE_NAMES[next.from]} — ` +
+      `${Math.round(next.mastery * 100)}% so far.`
+    : 'Every stage on this deck is open.';
+}
+
+/** Stages are a multi-select, but a round needs at least one. */
+function toggleStage(stage) {
+  const next = stages.includes(stage) ? stages.filter((s) => s !== stage) : [...stages, stage];
+  if (next.length === 0) return;
+  stages = next.sort();
+  startRound();
+}
+
+function renderModes() {
+  // The meta line names the ceiling each mode can reach, because that is the
+  // one thing about these four that is not obvious from their names — and it is
+  // the whole reason there are four.
+  const CAPS = { teach: 'to box 1', guided: 'to box 3', free: 'to mastery' };
+  const options = [
+    { id: null, name: 'Auto', meta: 'earned', note: 'Follow each card' },
+    ...MODES.map((mode) => ({ id: mode, name: MODE_LABELS[mode], meta: CAPS[mode], note: MODE_DESCRIPTIONS[mode] }))
+  ];
+
+  ui.modeRow.replaceChildren(
     ...options.map((option) => {
       const button = document.createElement('button');
       button.type = 'button';
+      button.className = 'stage';
       button.setAttribute('aria-pressed', String(option.id === preferredMode));
-      button.innerHTML = `${option.label}<small>${option.note}</small>`;
+      button.innerHTML =
+        `<span class="stage-name">${option.name}</span>` +
+        `<span class="stage-meta">${option.meta}</span>`;
+      button.title = option.note;
       button.addEventListener('click', () => {
         preferredMode = option.id;
         data = store.withPrefs(data, { mode: option.id ?? store.AUTO_MODE });
         persist();
-        renderModePicker();
+        renderModes();
+        startRound();
       });
       return button;
     })
@@ -180,133 +349,174 @@ function renderModePicker() {
 
   ui.modeNote.textContent =
     preferredMode === 'free'
-      ? 'A blank pad is the only mode that can master a character.'
+      ? 'A blank pad is the only mode that can take a character to the top box.'
       : preferredMode === null
-        ? ''
-        : 'Tracing keeps a character fresh but will not take it to mastery.';
+        ? 'Each character opens in the mode it has earned, and climbs as it is learned.'
+        : 'Tracing keeps a character fresh, but only a blank pad masters it.';
 }
 
-function renderScriptToggle() {
-  const mode = data.prefs.script;
-  ui.scriptToggle.textContent = SCRIPT_LABELS[mode];
-  ui.scriptToggle.title = SCRIPT_DESCRIPTIONS[mode];
-}
-
-function renderHome() {
-  renderGoal();
-  renderRoundTypes();
-  renderDecks();
-  renderModePicker();
-  renderScriptToggle();
-  show('home');
-}
-
-// ---------------------------------------------------------------- word round
+// ------------------------------------------------------------- word rounds
 
 function startWordRound() {
-  const questions = buildWordRound(deckId, [0, 1, 2], data.cards, Date.now(), {
-    direction: 'zh-en',
-    script: data.prefs.script
+  const deckId = ui.deck.value || DECKS[0].id;
+  const open = stages.filter((stage) => isStageUnlocked(deckId, stage, data.cards));
+  const usable = open.filter(
+    (stage) => stageProgress(deckId, stage, data.cards).total > 0
+  );
+  stages = usable.length ? usable : [0];
+
+  game = createGame({
+    deckId,
+    stages,
+    direction: ui.direction.value,
+    script: data.prefs.script,
+    cards: data.cards
   });
+  charRound = null;
+  depthAtRoundStart = unlockedDepth(deckId, data.cards);
+  game.startRound();
 
-  if (questions.length === 0) {
-    ui.lockedNote.textContent = 'That deck has no words at this stage yet.';
-    return;
-  }
-
-  round = { type: 'words', questions, index: 0, right: 0 };
-  show('words');
+  ui.play.hidden = false;
+  ui.write.hidden = true;
+  ui.summary.hidden = true;
   renderQuestion();
 }
 
 function renderQuestion() {
-  const question = round.questions[round.index];
+  const { state } = game;
+  renderScoreboard();
+  ui.roundProgress.style.width = `${(state.asked / state.roundLength) * 100}%`;
 
-  ui.wordProgress.style.width = `${(round.index / round.questions.length) * 100}%`;
-  ui.promptMain.textContent = question.prompt;
-  ui.promptMain.classList.toggle('is-hanzi', question.promptIsHanzi);
+  const question = state.question;
+  if (!question) return;
+
+  const side = DIRECTIONS[question.direction].promptSide;
+  ui.directionHint.textContent = side === 'zh' ? 'What does it mean…?' : 'How do you write it…?';
+
+  ui.prompt.textContent = question.prompt;
+  ui.prompt.classList.toggle('is-hanzi', question.promptIsHanzi);
   ui.promptSub.textContent = question.promptSub;
-  ui.wordFeedback.textContent = '';
 
   ui.choices.replaceChildren(
-    ...question.choices.map((choice) => {
+    ...question.choices.map((choice, index) => {
       const button = document.createElement('button');
-      button.className = 'choice' + (question.answerIsHanzi ? ' is-hanzi' : '');
       button.type = 'button';
-      button.textContent = choice;
-      button.addEventListener('click', () => answerWord(question, choice, button));
+      button.className = 'choice';
+      button.dataset.choice = choice;
+      button.innerHTML = `<span class="key">${index + 1}</span><span class="text"></span>`;
+      const text = button.querySelector('.text');
+      text.textContent = choice;
+      text.classList.toggle('is-hanzi', question.answerIsHanzi);
+      button.addEventListener('click', () => submit(choice));
       return button;
     })
   );
+
+  ui.feedback.textContent = ' ';
+  ui.feedback.className = 'feedback';
+  ui.hint.innerHTML = 'Answer with <kbd>1</kbd>–<kbd>4</kbd> · <kbd>Enter</kbd> to continue';
+  ui.hint.classList.remove('waiting');
+  fitPrompt();
 }
 
-function answerWord(question, choice, button) {
-  const right = isCorrect(question, choice);
-  const now = Date.now();
+/**
+ * Shrink a long prompt to keep it on one line. The line box is sized from
+ * --prompt-size rather than from the font, so shrinking never moves the board.
+ */
+function fitPrompt() {
+  const row = ui.prompt.parentElement;
+  ui.prompt.style.fontSize = '';
+  const available = row.clientWidth;
+  if (!available) return;
+  const width = ui.prompt.scrollWidth;
+  if (width > available) {
+    const base = parseFloat(getComputedStyle(ui.prompt).fontSize);
+    ui.prompt.style.fontSize = `${Math.floor(base * (available / width))}px`;
+  }
+}
 
-  const card = data.cards[question.word.zh] ?? newCard();
-  data = store.withCards(data, {
-    ...data.cards,
-    [question.word.zh]: review(card, right, now)
-  });
+function submit(choice) {
+  if (!game?.state.question || game.state.lastAnswer) return;
+
+  const result = game.answer(choice);
+  const question = result.question;
+
+  data = store.withCards(data, { ...data.cards, ...game.state.cards });
   persist();
 
   for (const node of ui.choices.children) {
     node.disabled = true;
-    if (node.textContent === question.answer) node.classList.add('right');
-    else if (node === button) node.classList.add('wrong');
+    if (node.dataset.choice === question.answer) node.classList.add('correct');
+    else if (node.dataset.choice === choice) node.classList.add('wrong');
   }
 
-  if (right) round.right += 1;
-
   const shown = displayWord(question.word, 'both');
-  ui.wordFeedback.textContent = right
-    ? `${shown.primary} — ${shown.secondary}`
-    : `${shown.primary} (${shown.secondary}) — ${question.word.en}`;
+  ui.feedback.innerHTML = result.correct
+    ? `<span class="han">${shown.primary}</span> · ${shown.secondary}`
+    : `<span class="han">${shown.primary}</span> · ${shown.secondary} — ${question.word.en}`;
+  ui.feedback.className = `feedback ${result.correct ? 'good' : 'bad'}`;
 
-  setTimeout(nextQuestion, right ? 700 : 1500);
+  renderScoreboard();
+  ui.roundProgress.style.width = `${(game.state.asked / game.state.roundLength) * 100}%`;
+
+  if (result.correct) {
+    setTimeout(advance, 700);
+  } else {
+    // The keys are wrapped so a touch device can drop them: this line is the
+    // one piece of guidance that stays on screen on a phone, and naming keys it
+    // does not have is worse than saying nothing.
+    ui.hint.innerHTML =
+      'Tap anywhere<span class="keys"> · <kbd>Enter</kbd> or <kbd>1</kbd>–<kbd>4</kbd></span> to continue';
+    ui.hint.classList.add('waiting');
+  }
 }
 
-function nextQuestion() {
-  round.index += 1;
-  if (round.index >= round.questions.length) return finishRound();
+function advance() {
+  if (!game?.state.lastAnswer) return;
+  if (game.isRoundOver()) return showSummary();
+  game.nextQuestion();
   renderQuestion();
 }
 
-// ---------------------------------------------------------------- character round
-
-let writer = null;
+// -------------------------------------------------------- character rounds
 
 function startCharacterRound() {
   const items = buildCharacterRound(data.cards, data.chars, Date.now(), { preferredMode });
   if (items.length === 0) {
-    ui.lockedNote.textContent = 'Master a word first — its characters unlock here.';
-    return;
+    roundType = 'words';
+    renderPracticeRow();
+    return startWordRound();
   }
 
-  round = { type: 'characters', items, index: 0, right: 0, attempt: null, hintLevel: 0 };
-  show('chars');
+  charRound = { items, index: 0, right: 0, attempt: null, hintLevel: 0 };
+  game = null;
+
+  ui.play.hidden = true;
+  ui.write.hidden = false;
+  ui.summary.hidden = true;
   renderCharacter();
 }
 
 async function renderCharacter() {
-  const item = round.items[round.index];
+  const item = charRound.items[charRound.index];
   const info = characterInfo(item.char);
 
-  round.attempt = newAttempt(item.char, item.mode);
-  round.hintLevel = 0;
+  charRound.attempt = newAttempt(item.char, item.mode);
+  charRound.hintLevel = 0;
 
-  ui.charProgress.style.width = `${(round.index / round.items.length) * 100}%`;
-  ui.charHint.textContent = '';
-  ui.charMode.textContent = MODE_LABELS[item.mode];
+  renderScoreboard();
+  ui.roundProgress.style.width = `${(charRound.index / charRound.items.length) * 100}%`;
+  ui.charFeedback.textContent = ' ';
+  ui.charFeedback.className = 'feedback';
+  ui.charHintBtn.disabled = false;
+  ui.writeHint.textContent = MODE_LABELS[item.mode];
 
   // The prompt is the meaning, never the character — on a blank pad the
-  // character is the answer, so showing it in the context word would give the
-  // whole thing away.
-  const hideIt = item.mode === 'free';
+  // character is the answer, so showing it in the context word gives it away.
+  const hide = item.mode === 'free';
   ui.charGloss.textContent = item.from.en;
   ui.charContext.innerHTML =
-    `<b>${hideIt ? item.from.zh.replaceAll(item.char, '□') : item.from.zh}</b> · ${item.from.py}` +
+    `<b>${hide ? item.from.zh.replaceAll(item.char, '□') : item.from.zh}</b> · ${item.from.py}` +
     (info.strokes ? ` · ${info.strokes} strokes` : '');
 
   ui.pad.replaceChildren();
@@ -316,7 +526,7 @@ async function renderCharacter() {
   if (!charData || !globalThis.HanziWriter) {
     // No geometry: the round still runs on the structural hints, and the
     // learner marks themselves rather than being blocked.
-    ui.charHint.textContent = 'Stroke data unavailable — write it on paper, then continue.';
+    ui.charFeedback.textContent = 'Stroke data unavailable — write it on paper, then continue.';
     ui.skip.textContent = 'Done';
     return;
   }
@@ -327,19 +537,17 @@ async function renderCharacter() {
     charDataLoader: (_char, onComplete) => onComplete(charData)
   });
 
-  if (demonstratesFirst(item.mode)) {
-    await writer.animateCharacter();
-  }
+  if (demonstratesFirst(item.mode)) await writer.animateCharacter();
   startQuiz(item, charData);
 }
 
 function startQuiz(item, charData) {
   writer.quiz({
     onMistake: () => {
-      round.attempt = recordStroke(round.attempt, false, charData.strokes.length);
+      charRound.attempt = recordStroke(charRound.attempt, false, charData.strokes.length);
     },
     onCorrectStroke: () => {
-      round.attempt = recordStroke(round.attempt, true, charData.strokes.length);
+      charRound.attempt = recordStroke(charRound.attempt, true, charData.strokes.length);
     },
     onComplete: () => finishCharacter(item)
   });
@@ -348,122 +556,262 @@ function startQuiz(item, charData) {
 function finishCharacter(item) {
   const now = Date.now();
   const card = data.chars[item.char] ?? newCard();
-  const success = isSuccess(round.attempt);
+  const success = isSuccess(charRound.attempt);
 
-  data = store.withChars(data, {
-    ...data.chars,
-    [item.char]: reviewCharacter(card, round.attempt, now)
-  });
+  data = store.withChars(data, { ...data.chars, [item.char]: reviewCharacter(card, charRound.attempt, now) });
   persist();
 
-  if (success) round.right += 1;
+  if (success) charRound.right += 1;
 
   const explanation = capExplanation(data.chars[item.char], item.mode);
-  ui.charHint.textContent = success
-    ? explanation ?? `${item.char} — good.`
-    : `${item.char} — worth another look.`;
+  ui.charFeedback.innerHTML = success
+    ? `<span class="han">${item.char}</span> — ${explanation ?? 'good.'}`
+    : `<span class="han">${item.char}</span> — worth another look.`;
+  ui.charFeedback.className = `feedback ${success ? 'good' : 'bad'}`;
 
   setTimeout(() => {
-    round.index += 1;
-    if (round.index >= round.items.length) return finishRound();
+    charRound.index += 1;
+    if (charRound.index >= charRound.items.length) return showSummary();
     renderCharacter();
-  }, 1100);
+  }, 1200);
 }
 
-ui.hint.addEventListener('click', async () => {
-  if (round?.type !== 'characters') return;
-  const hint = hintAt(round.attempt.char, round.hintLevel);
+async function useHint() {
+  if (!charRound || ui.write.hidden) return;
+  const hint = hintAt(charRound.attempt.char, charRound.hintLevel);
   if (!hint) return;
 
-  round.hintLevel = hint.level + 1;
-  round.attempt = takeHint(round.attempt);
-  ui.charHint.textContent = hint.text;
+  charRound.hintLevel = hint.level + 1;
+  charRound.attempt = takeHint(charRound.attempt);
+  ui.charFeedback.textContent = hint.text;
+  ui.charFeedback.className = 'feedback';
 
   if (hint.reveals === 'outline') writer?.showOutline();
   if (hint.reveals === 'nextStroke') {
-    // The strokes already drawn are the ones we are past; highlight the next.
-    await writer?.highlightStroke?.(round.attempt.strokesDrawn);
+    await writer?.highlightStroke?.(charRound.attempt.strokesDrawn);
   }
-  ui.hint.disabled = round.hintLevel >= HINT_LEVELS.length;
-});
+  ui.charHintBtn.disabled = charRound.hintLevel >= HINT_LEVELS.length;
+}
+
+ui.charHintBtn.addEventListener('click', useHint);
 
 ui.showAgain.addEventListener('click', async () => {
-  if (round?.type !== 'characters' || !writer) return;
-  // In the teaching mode watching the animation is the mode, not a hint. In the
-  // other two it hands over the whole character, so it costs a hint.
-  if (round.attempt.mode !== 'teach') round.attempt = takeHint(round.attempt);
+  if (!charRound || !writer) return;
+  // In the teaching mode watching the animation *is* the mode. In the other two
+  // it hands over the whole character, so it costs a hint.
+  if (charRound.attempt.mode !== 'teach') charRound.attempt = takeHint(charRound.attempt);
   await writer.animateCharacter();
-  const item = round.items[round.index];
+  const item = charRound.items[charRound.index];
   const charData = await loadCharacter(item.char);
   if (charData) startQuiz(item, charData);
 });
 
 ui.skip.addEventListener('click', () => {
-  if (round?.type !== 'characters') return;
-  finishCharacter(round.items[round.index]);
+  if (charRound && !ui.write.hidden) finishCharacter(charRound.items[charRound.index]);
 });
 
-// ---------------------------------------------------------------- finishing
+// ---------------------------------------------------------------- rounds
 
-function finishRound() {
-  const before = new Set(availableCharacters(data.cards).map((entry) => entry.char));
-
-  data = store.withDays(data, recordRound(data.days));
-  persist();
-
-  const after = availableCharacters(data.cards).map((entry) => entry.char);
-  const unlocked = after.filter((char) => !before.has(char));
-
-  const total = round.type === 'words' ? round.questions.length : round.items.length;
-  ui.doneTitle.textContent = round.right === total ? '全对 — all correct' : 'Round done';
-  ui.doneLine.textContent = `${round.right} of ${total}.`;
-  ui.doneUnlocked.textContent = unlocked.length
-    ? `New characters unlocked: ${unlocked.join(' ')}`
-    : '';
-
-  renderGoal();
-  show('done');
+function startRound() {
+  roundCredited = false;
+  populateDecks();
+  renderPracticeRow();
+  renderStages();
+  renderModes();
+  renderScriptToggle();
+  if (roundType === 'characters') startCharacterRound();
+  else startWordRound();
 }
 
-ui.again.addEventListener('click', () => {
-  if (round?.type === 'characters') startCharacterRound();
-  else startWordRound();
+function creditRound() {
+  const today = localDay();
+  const before = streakFrom(data.days, today, data.guards);
+
+  data = store.withDays(data, recordRound(data.days, today));
+
+  // Finishing a round picks the streak up again by itself — nobody should have
+  // to remember to turn their own guard off.
+  let released = false;
+  if (manualGuardOn(data.guards, today) === GUARD.GUARDED) {
+    data = store.withGuards(data, [...data.guards, guardEvent(GUARD.ACTIVE, today)]);
+    released = true;
+  }
+  persist();
+
+  return { before, after: streakFrom(data.days, today, data.guards), released };
+}
+
+function showSummary() {
+  // Answering schedules advance() on a timer and Enter calls it too, so the end
+  // of a round can be reached more than once. Crediting the day is not
+  // idempotent, so it is gated here rather than by only being called once.
+  if (roundCredited) return;
+  roundCredited = true;
+
+  const streaks = creditRound();
+  const wasWords = roundType === 'words';
+
+  ui.play.hidden = true;
+  ui.write.hidden = true;
+  ui.summary.hidden = false;
+
+  populateDecks();
+  renderPracticeRow();
+  renderStages();
+  renderScoreboard();
+  ui.roundProgress.style.width = '100%';
+
+  const accuracy = wasWords
+    ? game.accuracy()
+    : charRound.right / charRound.items.length;
+
+  ui.summaryTitle.textContent = wasWords ? 'Round complete!' : 'Characters done!';
+  ui.summaryAccuracy.textContent = `${Math.round(accuracy * 100)}%`;
+  ui.summaryToday.textContent = `${streaks.after.roundsToday}/${DAILY_GOAL}`;
+  ui.summaryLongest.textContent = streaks.after.longest;
+
+  if (wasWords) {
+    ui.summaryMastered.textContent = game.masteredCount();
+    ui.summaryMasteredLabel.textContent = 'words mastered';
+  } else {
+    const unlocked = availableCharacters(data.cards).map((char) => data.chars[char.char] ?? newCard());
+    ui.summaryMastered.textContent = unlocked.filter(isMastered).length;
+    ui.summaryMasteredLabel.textContent = 'characters you can write';
+  }
+
+  // Crossing a threshold mid-round is the reward; call it out first.
+  const depth = unlockedDepth(ui.deck.value, data.cards);
+  const opened = wasWords && depth > depthAtRoundStart;
+  ui.unlockBanner.hidden = !opened;
+  if (opened) ui.unlockBanner.textContent = `🔓 ${STAGE_NAMES[depth]} unlocked!`;
+  depthAtRoundStart = depth;
+
+  renderGoalBanner(streaks);
+
+  // After the summary is up, so the notice lands on top of it rather than being
+  // the first thing seen and hiding what the round achieved.
+  if (streaks.released) noticeGuard(GUARD.ACTIVE, true);
+}
+
+function renderGoalBanner(streaks) {
+  const { after, before } = streaks;
+  if (after.hitToday && !before.hitToday) {
+    ui.goalBanner.hidden = false;
+    ui.goalBanner.className = 'goal-banner';
+    ui.goalBanner.textContent =
+      after.current > 1 ? `🎯 Goal met — ${after.current} days running!` : '🎯 Daily goal met!';
+    return;
+  }
+  if (!after.hitToday && after.current > 0 && after.graceDaysLeft < GRACE_DAYS) {
+    ui.goalBanner.hidden = false;
+    ui.goalBanner.className = 'goal-banner warning';
+    ui.goalBanner.textContent =
+      `${DAILY_GOAL - after.roundsToday} more round${DAILY_GOAL - after.roundsToday === 1 ? '' : 's'} to keep the streak.`;
+    return;
+  }
+  ui.goalBanner.hidden = true;
+}
+
+ui.again.addEventListener('click', startRound);
+
+// ------------------------------------------------------------ streak guard
+
+function noticeGuard(state, released = false) {
+  ui.guardNoticeTitle.textContent = released ? 'Streak guard off' : 'Streak guard on';
+  ui.guardNoticeBody.textContent = released
+    ? 'You finished a round, so your streak is running again. Nothing to turn off.'
+    : 'Your streak is held until you turn this off, or until you finish a round.';
+  ui.guardNotice.showModal();
+  void state;
+}
+
+function openGuardDialog() {
+  const today = localDay();
+  const on = manualGuardOn(data.guards, today) === GUARD.GUARDED;
+  const streak = streakFrom(data.days, today, data.guards);
+
+  ui.guardBody.textContent = on
+    ? `Your ${streak.current}-day streak is being held.`
+    : streak.current > 0
+      ? `Your streak is ${streak.current} day${streak.current === 1 ? '' : 's'} long, with ${streak.graceDaysLeft} of grace left.`
+      : 'No streak to hold yet — finish five rounds today to start one.';
+  ui.guardToggle.textContent = on ? 'Turn it off' : 'Hold my streak';
+  ui.guardDialog.showModal();
+}
+
+ui.guardShield.addEventListener('click', openGuardDialog);
+el('streak-stat').addEventListener('click', openGuardDialog);
+ui.guardClose.addEventListener('click', () => ui.guardDialog.close());
+ui.guardNoticeOk.addEventListener('click', () => ui.guardNotice.close());
+
+ui.guardToggle.addEventListener('click', () => {
+  const today = localDay();
+  const on = manualGuardOn(data.guards, today) === GUARD.GUARDED;
+  data = store.withGuards(data, [...data.guards, guardEvent(on ? GUARD.ACTIVE : GUARD.GUARDED, today)]);
+  persist();
+  ui.guardDialog.close();
+  renderScoreboard();
+  if (!on) noticeGuard(GUARD.GUARDED);
 });
 
-ui.home.addEventListener('click', renderHome);
-ui.startCharacters.addEventListener('click', startCharacterRound);
+// The warning line offers to pause the streak; the offer has to work.
+ui.scoreboardNote.addEventListener('click', (event) => {
+  if (event.target.closest('[data-open-guard]')) openGuardDialog();
+});
 
-// ---------------------------------------------------------------- chrome
+// ------------------------------------------------------------- transfer
 
-ui.scriptToggle.addEventListener('click', () => {
-  data = store.withPrefs(data, { script: cycleScript(data.prefs.script) });
-  persist();
-  renderScriptToggle();
-  if (round?.type === 'words') {
-    // Re-render the current question so the change is visible immediately
-    // rather than at the next question.
-    const question = round.questions[round.index];
-    const shown = displayWord(question.word, data.prefs.script);
-    if (question.direction === 'zh-en') {
-      ui.promptMain.textContent = shown.primary;
-      ui.promptMain.classList.toggle('is-hanzi', shown.isHanzi);
-      ui.promptSub.textContent = shown.secondary;
-    }
+function openTransfer() {
+  ui.transferOut.value = store.exportProgress(data);
+  ui.transferIn.value = '';
+  ui.transferStatus.textContent = '';
+  ui.transferStatus.className = 'transfer-status';
+  ui.transferDialog.showModal();
+}
+
+ui.openTransfer.addEventListener('click', openTransfer);
+ui.transferClose.addEventListener('click', () => ui.transferDialog.close());
+
+ui.transferCopy.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(ui.transferOut.value);
+    say(ui.transferStatus, 'Copied.', 'good');
+  } catch {
+    ui.transferOut.select();
+    say(ui.transferStatus, 'Press ⌘C or Ctrl+C to copy.', 'bad');
   }
 });
 
+ui.transferImport.addEventListener('click', () => {
+  try {
+    const incoming = store.parseProgress(ui.transferIn.value.trim());
+    data = { ...data, ...incoming };
+    persist();
+    ui.transferDialog.close();
+    startRound();
+  } catch (error) {
+    say(ui.transferStatus, error.message, 'bad');
+  }
+});
+
+function say(node, text, tone) {
+  node.textContent = text;
+  node.className = `transfer-status ${tone}`;
+}
+
+// ----------------------------------------------------------------- share
+
 /**
- * Share the app. navigator.share is the right thing on a phone — it opens the
- * system sheet — and a cancelled sheet rejects with AbortError, which is
- * somebody changing their mind, not a failure to report.
+ * navigator.share is the right thing on a phone — it opens the system sheet —
+ * and a cancelled sheet rejects with AbortError, which is somebody changing
+ * their mind, not a failure to report.
  */
 async function share() {
   const url = location.href.split('#')[0];
-  const payload = { title: 'Wenmang', text: 'Mandarin words and characters', url };
 
   if (navigator.share) {
     try {
-      await navigator.share(payload);
+      await navigator.share({ title: 'Wenmang', text: 'Mandarin words and characters', url });
       return;
     } catch (error) {
       if (error?.name === 'AbortError') return;
@@ -488,16 +836,105 @@ function sayShared(text) {
 
 ui.share.addEventListener('click', share);
 
-// Answer with the keyboard as well as the mouse.
-document.addEventListener('keydown', (event) => {
-  if (round?.type !== 'words' || ui.screens.words.hidden) return;
-  const index = Number(event.key) - 1;
-  const button = ui.choices.children[index];
-  if (button && !button.disabled) button.click();
+// --------------------------------------------------------------- settings
+
+ui.deck.addEventListener('change', () => {
+  stages = [0];
+  startRound();
 });
 
-ui.attribution.textContent = `${ATTRIBUTION} Radical and stroke-count data from the Unicode Han Database.`;
+ui.direction.addEventListener('change', () => {
+  if (roundType === 'words') startWordRound();
+});
+
+ui.scriptToggle.addEventListener('click', () => {
+  data = store.withPrefs(data, { script: cycleScript(data.prefs.script) });
+  persist();
+  renderScriptToggle();
+
+  // Mid-question, only the prompt changes — reshuffling the buttons under
+  // somebody's hand would hand them a different question from the one they were
+  // part-way through answering.
+  if (game?.state.question && ui.play.hidden === false) {
+    game.setScript(data.prefs.script);
+    const question = game.state.question;
+    ui.prompt.textContent = question.prompt;
+    ui.prompt.classList.toggle('is-hanzi', question.promptIsHanzi);
+    ui.promptSub.textContent = question.promptSub;
+    fitPrompt();
+  }
+});
+
+/**
+ * "Mixed (recommended)" does not fit a phone's select, and a native option
+ * cannot be trimmed with CSS — it truncates to "Mixed (reco…", which reads as a
+ * mistake. The word is dropped where there is no room for it.
+ */
+function fitDirectionOption() {
+  const option = ui.direction.querySelector('option[data-full]');
+  if (!option) return;
+  option.textContent = window.innerWidth < 460 ? option.dataset.short : option.dataset.full;
+}
+
+// ---------------------------------------------------------------- keyboard
+
+document.addEventListener('keydown', (event) => {
+  // A dialog owns the keyboard while it is up. The transfer one has text
+  // fields, where digits have to type rather than answer.
+  if (document.querySelector('dialog[open]')) return;
+
+  if (!ui.write.hidden && (event.key === 'h' || event.key === 'H')) {
+    useHint();
+    return;
+  }
+
+  if (event.key >= '1' && event.key <= '4' && !ui.play.hidden) {
+    // Once answered, every choice is disabled and the digits have no question
+    // left to answer — so they carry on instead. The hand is already there.
+    if (game?.state.lastAnswer) advance();
+    else {
+      const button = ui.choices.children[Number(event.key) - 1];
+      if (button && !button.disabled) button.click();
+    }
+  }
+
+  if (event.key === 'Enter') {
+    if (!ui.summary.hidden) startRound();
+    else if (!ui.play.hidden) advance();
+  }
+});
+
+// Tapping the card carries on after a miss — a phone has no Enter key.
+ui.play.addEventListener('click', (event) => {
+  if (event.target.closest('.choice')) return;
+  if (game?.state.lastAnswer) advance();
+});
+
+// Explaining a tile on hover, and on focus so it also works by keyboard and by
+// tapping on a phone, where there is no hover at all.
+for (const tile of document.querySelectorAll('[data-tip]')) {
+  const show = () => { hoveredTip = tile.dataset.tip; renderNote(); };
+  const hide = () => { hoveredTip = null; renderNote(); };
+  tile.addEventListener('mouseenter', show);
+  tile.addEventListener('focus', show);
+  tile.addEventListener('mouseleave', hide);
+  tile.addEventListener('blur', hide);
+}
+
+window.addEventListener('resize', () => {
+  fitDirectionOption();
+  if (!ui.play.hidden) fitPrompt();
+});
+
+// ------------------------------------------------------------------- boot
+
+ui.attribution.textContent =
+  `${ATTRIBUTION} Radical and stroke-count data from the Unicode Han Database.`;
 
 // AUTO_MODE means "follow each card", which is null to everything downstream.
 preferredMode = data.prefs.mode === store.AUTO_MODE ? null : data.prefs.mode;
-renderHome();
+
+populateDecks();
+ui.direction.value = MIXED;
+fitDirectionOption();
+startRound();

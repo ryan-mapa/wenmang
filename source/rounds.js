@@ -12,10 +12,9 @@
 // the wrong order and then has to unlearn it.
 
 import { selectNext, newCard } from './srs.js';
-import { selectionPool } from './stages.js';
 import { availableCharacters, teachingOrder } from './characters.js';
 import { suggestedMode } from './writing.js';
-import { buildQuestion } from './quiz.js';
+import { ROUND_LENGTH as WORD_ROUND_LENGTH_SOURCE } from './game.js';
 
 export const ROUND_TYPES = ['words', 'characters'];
 
@@ -24,7 +23,8 @@ export const ROUND_LABELS = {
   characters: 'Characters'
 };
 
-export const WORD_ROUND_LENGTH = 20;
+/** Word rounds are game.js's business; re-exported so the picker can label them. */
+export const WORD_ROUND_LENGTH = WORD_ROUND_LENGTH_SOURCE;
 export const CHARACTER_ROUND_LENGTH = 10;
 
 export function roundLength(type) {
@@ -41,31 +41,6 @@ export function roundLength(type) {
  */
 export function charactersReady(wordCards) {
   return availableCharacters(wordCards).length > 0;
-}
-
-/**
- * The sequence of questions for a word round.
- *
- * Built up front rather than one at a time so the round has a knowable length
- * and a progress bar that does not lie. `avoid` threading is what stops the
- * same word appearing twice in a row across the whole round, not just between
- * consecutive picks.
- */
-export function buildWordRound(deckId, stages, cards, now, options = {}) {
-  const { direction = 'zh-en', script = 'hanzi', random = Math.random, length = WORD_ROUND_LENGTH } = options;
-  const pool = selectionPool(deckId, stages, cards);
-  if (pool.length === 0) return [];
-
-  const questions = [];
-  let avoid = null;
-
-  for (let i = 0; i < length; i++) {
-    const word = selectNext(pool, cards, now, { avoid, random, keyOf: (w) => w.zh });
-    if (!word) break;
-    questions.push(buildQuestion(word, pool, direction, script, random));
-    avoid = word.zh;
-  }
-  return questions;
 }
 
 /**

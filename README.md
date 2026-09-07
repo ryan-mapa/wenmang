@@ -16,7 +16,7 @@ No build step — ES modules straight from the filesystem:
 ```sh
 npm install
 npm run serve      # http://localhost:8000
-npm test           # 125 tests
+npm test           # 138 tests
 ```
 
 ## How it works
@@ -25,6 +25,16 @@ npm test           # 125 tests
 come from the same deck, so a question is a real test rather than a reading
 exercise. A card climbs a box on a right answer and falls to the bottom on a
 wrong one, with intervals in real time rather than question counts.
+
+**Direction.** 中文 → English is recognition; English → 中文 is recall, and in
+Chinese the gap is wider than in a language written with an alphabet — you can
+recognise 蝴蝶 on sight long before you could pick it from four plausible
+character strings. A mixed round is exactly half and half, but *which* words
+spend the recall slots is weighted by how well each one is known.
+
+**Stages.** Each deck runs Basics → Everyday → Fluent, and a stage opens at 60%
+mastery of the one before it. Stages are a multi-select, so Basics and Everyday
+can be studied together rather than one or the other.
 
 **Script.** One toggle cycles characters → pinyin → both. The default is
 characters alone, deliberately: pinyin shown beside a character gets read
@@ -58,13 +68,20 @@ that the attempt stops counting as a success.
 
 **Daily goal.** Five rounds, of either kind — a day spent entirely on
 handwriting is as complete as one spent entirely on meanings. Streaks forgive
-three missed days and can be held manually for a holiday.
+three missed days, and a **streak guard** holds one deliberately for a holiday.
+Nothing turns the guard on for you, so a streak that survives is one somebody
+decided to protect; finishing a round releases it again by itself.
+
+**Move progress.** Progress lives in this browser alone, so it can be exported
+as a code and pasted into another browser or device. The code carries both the
+words and the handwriting.
 
 ## Layout
 
 ```
 source/
   vocab.js          the decks — 159 words, four categories, Basics stage
+  game.js           word-round state: mixed direction, recall weighting, scoring
   character-data.js GENERATED radical and stroke counts (tools/build-characters.mjs)
   radicals.js       the 214 Kangxi radicals, forms and glosses
   characters.js     which characters are unlocked, and in what teaching order
@@ -72,7 +89,7 @@ source/
   strokes.js        the ONLY module that knows where stroke geometry comes from
   srs.js            Leitner scheduling, for word cards and character cards alike
   quiz.js           multiple-choice construction
-  rounds.js         round composition for both kinds
+  rounds.js         character-round composition and which round types are open
   stages.js         stage gating within a deck
   goals.js          the daily goal and the streak
   script.js         characters / pinyin / both
@@ -97,6 +114,15 @@ stroke geometry is Arphic-licensed data fetched at runtime and never vendored,
 which keeps the redistribution obligations off this repository; radical data is
 from Unihan under the Unicode License. `source/strokes.js` is the only module
 that touches the stroke data, so the source can be swapped in one file.
+
+## Look
+
+One screen, dark, laid out like its sibling
+[Vocabulario](https://vocabulario.ryan-mapa.dev): a settings row, four stat
+tiles, a stage strip, and one card that swaps between a word question, the
+writing pad, and the round summary. The palette is its own — ink and celadon,
+a warm near-black ground with a 青 (qīng) teal running into jade, and cinnabar
+kept for misses and for danger.
 
 ## Not done yet
 

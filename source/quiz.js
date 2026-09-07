@@ -61,3 +61,19 @@ export function buildQuestion(word, pool, direction, script, random = Math.rando
 export function isCorrect(question, choice) {
   return choice === question.answer;
 }
+
+/**
+ * The same question shown under a different script setting.
+ *
+ * Only the prompt changes. Rebuilding the whole question would redraw the
+ * distractors, so flipping the toggle mid-question would reshuffle the buttons
+ * under the reader's hand — and hand them a different question from the one
+ * they were part-way through answering.
+ */
+export function reprompt(question, script) {
+  const { promptSide } = DIRECTIONS[question.direction] ?? DIRECTIONS['zh-en'];
+  if (promptSide !== 'zh') return question;
+
+  const shown = displayWord(question.word, script);
+  return { ...question, prompt: shown.primary, promptSub: shown.secondary, promptIsHanzi: shown.isHanzi };
+}

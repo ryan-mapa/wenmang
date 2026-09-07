@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  buildWordRound,
   buildCharacterRound,
   charactersReady,
   availableRounds,
@@ -11,40 +10,9 @@ import {
 import { mulberry32 } from '../source/random.js';
 import { newCard, BOX_COUNT } from '../source/srs.js';
 import { availableCharacters, teachingOrder } from '../source/characters.js';
-import { ALL_DECK_ID } from '../source/vocab.js';
 
 const mastered = () => ({ ...newCard(), box: BOX_COUNT - 1 });
 const rng = () => mulberry32(7);
-
-describe('word rounds', () => {
-  it('is twenty questions long', () => {
-    const round = buildWordRound('shiwu', [0], {}, 0, { random: rng() });
-    expect(round).toHaveLength(WORD_ROUND_LENGTH);
-  });
-
-  it('never asks the same word twice in a row', () => {
-    const round = buildWordRound('shiwu', [0], {}, 0, { random: rng() });
-    for (let i = 1; i < round.length; i++) {
-      expect(round[i].word.zh).not.toBe(round[i - 1].word.zh);
-    }
-  });
-
-  it('gives every question four distinct choices including the answer', () => {
-    for (const question of buildWordRound('shiwu', [0], {}, 0, { random: rng() })) {
-      expect(new Set(question.choices).size).toBe(4);
-      expect(question.choices).toContain(question.answer);
-    }
-  });
-
-  it('comes back empty for a stage with no words rather than throwing', () => {
-    expect(buildWordRound('shiwu', [1], {}, 0, { random: rng() })).toEqual([]);
-  });
-
-  it('can draw across every deck at once', () => {
-    const round = buildWordRound(ALL_DECK_ID, [0], {}, 0, { random: rng() });
-    expect(round).toHaveLength(WORD_ROUND_LENGTH);
-  });
-});
 
 describe('character rounds', () => {
   const wordCards = { 苹果: mastered(), 妈妈: mastered(), 老师: mastered(), 学生: mastered() };
