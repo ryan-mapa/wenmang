@@ -61,6 +61,7 @@ const ui = {
   deleteFinalCancel: el('delete-final-cancel'),
   deleteConfirm: el('delete-confirm'),
   guardBadge: el('guard-badge'),
+  streakStat: el('streak-stat'),
 
   today: el('today'),
   todayStat: el('today-stat'),
@@ -239,8 +240,12 @@ function renderScoreboard() {
 
   ui.streak.textContent = streak.current;
   ui.streak.classList.toggle('lit', streak.current > 0);
-  ui.guardBadge.textContent = streak.guard === GUARD.GUARDED ? '●' : '';
-  ui.guardShield.classList.toggle('on', streak.guard === GUARD.GUARDED);
+  // The tile carries the state, not the button: the streak is the thing being
+  // held, and that is where somebody looks to see whether it is.
+  const guarded = streak.guard === GUARD.GUARDED;
+  ui.streakStat.classList.toggle('guarded', guarded);
+  ui.guardShield.classList.toggle('on', guarded);
+  ui.guardShield.title = guarded ? 'Streak guard is on' : 'Streak guard';
 
   // The two right-hand tiles report whichever skill is being practised. In a
   // writing round "mastered words" is not the number anybody is watching.
@@ -1035,7 +1040,7 @@ function openGuardDialog() {
     : streak.current > 0
       ? `Your streak is ${streak.current} day${streak.current === 1 ? '' : 's'} long, with ${streak.graceDaysLeft} of grace left.`
       : 'No streak to hold yet — finish five rounds today to start one.';
-  ui.guardToggle.textContent = on ? 'Turn it off' : 'Hold my streak';
+  ui.guardToggle.textContent = on ? 'Resume my streak' : 'Pause my streak';
   ui.guardDialog.showModal();
 }
 

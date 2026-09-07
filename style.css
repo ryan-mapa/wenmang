@@ -141,9 +141,6 @@ select {
 .chip-toggle:hover { color: var(--ink); border-color: var(--muted); }
 
 .shield svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; }
-/* Two bars inside the shield. A shield alone says "protected"; the bars are
-   what make this the control the warning line calls "pause it". */
-.shield .pause { stroke-width: 2; stroke-linecap: round; }
 .shield.on { color: var(--qing); border-color: var(--qing); }
 .shield.on svg { fill: var(--qing); fill-opacity: 0.18; }
 
@@ -208,7 +205,24 @@ button.stat { cursor: pointer; }
 .stat-value { display: block; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
 
-.guard-badge { position: absolute; top: 5px; right: 7px; font-size: 10px; line-height: 1; color: var(--qing); }
+/* The pause mark on the streak tile, drawn with borders rather than a pause
+   character — at this size a glyph pair closes up into a solid block and reads
+   as a warning square rather than as two bars. */
+.guard-badge {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  width: 7px;
+  height: 9px;
+  border-left: 2px solid var(--line);
+  border-right: 2px solid var(--line);
+  transition: border-color 0.2s ease;
+}
+
+/* A held streak is dashed rather than solid: the tile is still counting, but
+   the count is on hold, and a dashed edge says "paused" without a word. */
+.stat.guarded { border-color: var(--qing); border-style: dashed; }
+.stat.guarded .guard-badge { border-color: var(--qing); }
 
 .scoreboard-note {
   /* Held open so the row below does not jump as the line comes and goes. */
@@ -849,6 +863,12 @@ kbd { background: var(--panel-hi); border: 1px solid var(--line); border-radius:
   .hint { display: none; }
   .hint .keys { display: none; }
   .hint.waiting { display: block; }
+}
+
+/* Hover states, for devices that actually have a pointer. A touch screen has
+   no way to stop hovering, so a tapped control stays outlined afterwards. */
+@media (hover: hover) {
+  button.stat:hover .guard-badge { border-color: var(--muted); }
 }
 
 @media (prefers-reduced-motion: reduce) {
