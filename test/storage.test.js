@@ -32,7 +32,7 @@ describe('an empty start', () => {
   });
 
   it('gives usable default preferences', () => {
-    expect(load().prefs).toEqual({ script: 'hanzi', mode: 'auto', characterSource: 'all' });
+    expect(load().prefs).toMatchObject({ script: 'hanzi', mode: 'auto', characterSource: 'all' });
   });
 });
 
@@ -52,12 +52,31 @@ describe('round trips', () => {
 
   it('persists preferences', () => {
     save(withPrefs(load(), { script: 'both', mode: 'free', characterSource: 'known' }));
-    expect(load().prefs).toEqual({ script: 'both', mode: 'free', characterSource: 'known' });
+    expect(load().prefs).toMatchObject({ script: 'both', mode: 'free', characterSource: 'known' });
+  });
+
+  it('starts with sound on — absent is not off', () => {
+    expect(load().prefs.sound).toBe(true);
+  });
+
+  it('remembers the deck and direction across a reload', () => {
+    save(withPrefs(load(), { deck: 'shiwu', direction: 'zh-en' }));
+    expect(load().prefs.deck).toBe('shiwu');
+    expect(load().prefs.direction).toBe('zh-en');
+  });
+
+  it('remembers no deck until one is chosen', () => {
+    expect(load().prefs.deck).toBeNull();
+  });
+
+  it('remembers sound being turned off', () => {
+    save(withPrefs(load(), { sound: false }));
+    expect(load().prefs.sound).toBe(false);
   });
 
   it('repairs a preference that is no longer valid', () => {
     save(withPrefs(load(), { script: 'zhuyin', mode: 'tracing', characterSource: 'invalid' }));
-    expect(load().prefs).toEqual({ script: 'hanzi', mode: 'auto', characterSource: 'all' });
+    expect(load().prefs).toMatchObject({ script: 'hanzi', mode: 'auto', characterSource: 'all' });
   });
 });
 

@@ -60,7 +60,7 @@ const EMPTY = {
   chars: {},
   days: {},
   guards: [],
-  prefs: { script: DEFAULT_SCRIPT, mode: AUTO_MODE, characterSource: 'all' },
+  prefs: { script: DEFAULT_SCRIPT, mode: AUTO_MODE, characterSource: 'all', sound: true, deck: null, direction: null },
   syncedAt: 0
 };
 
@@ -134,7 +134,16 @@ function readPrefs(raw) {
     // Anything unrecognised falls back to auto rather than to a writing mode:
     // a corrupt preference must not quietly pin someone to tracing forever.
     mode: isMode(raw?.mode) ? raw.mode : AUTO_MODE,
-    characterSource: raw?.characterSource === 'known' ? 'known' : 'all'
+    characterSource: raw?.characterSource === 'known' ? 'known' : 'all',
+    // Sound defaults on. Absent is not off — a learner who has never touched
+    // the toggle should hear the button work the first time they press it.
+    sound: raw?.sound !== false,
+    // The deck last chosen. Null until something is picked, and validated
+    // against the real deck list on read rather than trusted: a deck can be
+    // renamed or retired between sessions, and a stored id that no longer
+    // exists must not leave the app pointing at nothing.
+    deck: typeof raw?.deck === 'string' ? raw.deck : null,
+    direction: typeof raw?.direction === 'string' ? raw.direction : null
   };
 }
 

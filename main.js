@@ -116,6 +116,7 @@ const ui = {
   summaryLongest: el('summary-longest'),
   again: el('again'),
 
+  sound: el('sound'),
   share: el('share'),
   shareNote: el('share-note'),
   attribution: el('attribution'),
@@ -168,6 +169,9 @@ let spoken = new Set();
 
 /** Which of the four voices was heard last, so the next tap gives another. */
 let lastVoice = null;
+
+/** Whether sound is on. Persisted, so it survives a reload. */
+let soundOn = data.prefs.sound;
 
 /** The clip currently playing, so a second tap can interrupt the first. */
 let playing = null;
@@ -1088,7 +1092,7 @@ function renderDots(dots) {
  * carry meaning.
  */
 function speak(button, dots, zh) {
-  if (!hasClip(spoken, zh)) return;
+  if (!soundOn || !hasClip(spoken, zh)) return;
 
   if (playing) {
     playing.audio.pause();
@@ -1124,7 +1128,7 @@ function speak(button, dots, zh) {
 function renderPromptSpeaker() {
   const question = game?.state.question;
   const show =
-    Boolean(question) && hasClip(spoken, question.word.zh) && canPlay(question.direction);
+    soundOn && Boolean(question) && hasClip(spoken, question.word.zh) && canPlay(question.direction);
 
   ui.speakPrompt.hidden = !show;
   ui.speakPromptDots.hidden = !show;
@@ -1140,12 +1144,35 @@ function renderPromptSpeaker() {
  */
 function renderWriteSpeaker() {
   const word = charRound?.items[charRound.index]?.word;
-  const show = Boolean(word) && hasClip(spoken, word.zh);
+  const show = soundOn && Boolean(word) && hasClip(spoken, word.zh);
 
   ui.speakWrite.hidden = !show;
   ui.speakWriteDots.hidden = !show;
   if (show) renderDots(ui.speakWriteDots);
 }
+
+function renderSound() {
+  ui.sound.setAttribute('aria-pressed', String(soundOn));
+  ui.sound.setAttribute('aria-label', soundOn ? 'Sound on' : 'Sound off');
+}
+
+ui.sound.addEventListener('click', () => {
+  soundOn = !soundOn;
+  data = store.withPrefs(data, { sound: soundOn });
+  persist();
+
+  // Stop anything mid-clip, or muting would leave the current word still
+  // talking — which is the one moment somebody is most likely to be reaching
+  // for this button.
+  if (!soundOn && playing) {
+    playing.audio.pause();
+    playing.button.classList.remove('playing');
+    playing = null;
+  }
+  renderSound();
+  renderPromptSpeaker();
+  renderWriteSpeaker();
+});
 
 ui.speakPrompt.addEventListener('click', () => {
   const word = game?.state.question?.word;
@@ -1389,11 +1416,15 @@ ui.characterSource.addEventListener('change', () => {
 });
 
 ui.deck.addEventListener('change', () => {
+  data = store.withPrefs(data, { deck: ui.deck.value });
+  persist();
   stages = unlockedStages(ui.deck.value);
   startRound();
 });
 
 ui.direction.addEventListener('change', () => {
+  data = store.withPrefs(data, { direction: ui.direction.value });
+  persist();
   if (roundType === 'words') startWordRound();
 });
 
@@ -1473,8 +1504,20 @@ ui.attribution.textContent =
 preferredMode = data.prefs.mode === store.AUTO_MODE ? null : data.prefs.mode;
 
 populateDecks();
-ui.direction.value = MIXED;
-stages = unlockedStages(ui.deck.value || ALL_DECK_ID);
+
+// Come back to the deck and direction you left on. A stored id is checked
+// against the options actually on the page rather than trusted — a deck can be
+// renamed or retired between sessions, and a dangling id would otherwise leave
+// the select showing nothing at all.
+const remembered = [...ui.deck.options].some((option) => option.value === data.prefs.deck);
+ui.deck.value = remembered ? data.prefs.deck : ALL_DECK_ID;
+
+ui.direction.value = [...ui.direction.options].some((o) => o.value === data.prefs.direction)
+  ? data.prefs.direction
+  : MIXED;
+
+renderSound();
+stages = unlockedStages(ui.deck.value);
 startRound();
 
 // The manifest decides whether any speaker button appears, so load it and

@@ -126,7 +126,6 @@
       <p class="direction-hint" id="direction-hint">What does it mean…?</p>
       <div class="prompt-row">
         <p class="prompt" id="prompt" translate="no">—</p>
-        <p class="prompt-sub" id="prompt-sub" translate="no"></p>
         <span class="speak-stack">
           <button class="speak" id="speak-prompt" type="button" hidden
                   aria-label="Hear it pronounced" title="Hear it pronounced">
@@ -139,6 +138,7 @@
           <span class="dots" id="speak-prompt-dots" hidden aria-hidden="true"></span>
         </span>
       </div>
+      <p class="prompt-sub" id="prompt-sub" translate="no"></p>
       <div class="choices" id="choices" translate="no"></div>
       <p class="feedback" id="feedback" role="status" aria-live="polite" translate="no">&nbsp;</p>
       <p class="hint" id="hint">Answer with <kbd>1</kbd>–<kbd>4</kbd> · <kbd>Enter</kbd> to continue</p>
@@ -151,9 +151,9 @@
     <!-- Character writing -->
     <section class="card" id="write" hidden>
       <p class="direction-hint" id="write-hint">Write it…</p>
-      <p class="char-gloss" id="char-gloss"></p>
-      <p class="char-context" id="char-context" translate="no"></p>
-      <span class="speak-stack">
+      <div class="prompt-row">
+        <p class="char-gloss" id="char-gloss"></p>
+        <span class="speak-stack">
         <button class="speak" id="speak-write" type="button" hidden
                 aria-label="Hear it pronounced" title="Hear it pronounced">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -162,8 +162,10 @@
             <path class="wave" d="M19.2 6.2a8 8 0 0 1 0 11.6"/>
           </svg>
         </button>
-        <span class="dots" id="speak-write-dots" hidden aria-hidden="true"></span>
-      </span>
+          <span class="dots" id="speak-write-dots" hidden aria-hidden="true"></span>
+        </span>
+      </div>
+      <p class="char-context" id="char-context" translate="no"></p>
       <!-- One square per character of the word, built in main.js. -->
       <div class="pad-row" id="pad-row"></div>
       <p class="feedback" id="char-feedback" role="status" aria-live="polite"></p>
@@ -197,6 +199,14 @@
       </span>
       <div class="footer-actions">
         <span class="share-note" id="share-note" role="status" aria-live="polite"></span>
+        <button class="icon-toggle" id="sound" type="button" aria-pressed="true" aria-label="Sound on">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4 9v6h4l5 4V5L8 9H4z"/>
+            <path class="on-wave" d="M16.5 8.8a4.5 4.5 0 0 1 0 6.4"/>
+            <path class="on-wave" d="M19.2 6.2a8 8 0 0 1 0 11.6"/>
+            <path class="off-slash" d="M17 9l5 6M22 9l-5 6"/>
+          </svg>
+        </button>
         <button class="icon-toggle" id="share" type="button" aria-label="Share this app" title="Share this app">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <circle class="node" cx="18" cy="5" r="2.6"/>
