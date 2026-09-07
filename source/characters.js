@@ -1,7 +1,11 @@
-// Character practice draws from all vocabulary or words currently answered correctly.
-// Every character retains a vocabulary word for context.
+// Which characters are available to write, and in what order.
+//
+// Character practice is filtered the same two ways the learner already thinks
+// about their vocabulary: by deck, and by whether they know the word yet. Every
+// character keeps a word alongside it, because a character with no word is a
+// shape with no reason to be learned.
 
-import { allWords } from './vocab.js';
+import { allWords, deckWords, ALL_DECK_ID } from './vocab.js';
 import { CHARACTER_DATA } from './character-data.js';
 import { getRadical, formsOf } from './radicals.js';
 import { newCard } from './srs.js';
@@ -42,15 +46,25 @@ export function wordsUsing(char) {
 }
 
 /**
- * Characters from all words, or known words (a current box above zero).
+ * Characters to practise writing, from one deck or from all of them.
+ *
+ * Two filters, and they answer different questions. `deckId` is the subject the
+ * learner picked — writing the characters of the Food deck is a coherent
+ * session in a way that writing ten characters drawn from the whole language is
+ * not. `source` is how much of that deck they have earned: everything in it, or
+ * only words whose last answer was right.
  *
  * `wordCards` is the vocabulary card map — writing progress lives in a separate
  * map and is deliberately not consulted here. Availability is a question about
  * what you understand, not about what you have already practised writing.
+ *
+ * Deduped by character, and the first word to claim one keeps it. So a
+ * character shared by two words is practised once, in the context of whichever
+ * word the deck reaches first.
  */
-export function availableCharacters(wordCards, source = 'all') {
+export function availableCharacters(wordCards, source = 'all', deckId = ALL_DECK_ID) {
   const unlocked = new Map();
-  for (const word of allWords()) {
+  for (const word of deckWords(deckId)) {
     const card = wordCards[word.zh] ?? newCard();
     if (source === 'known' && card.box <= 0) continue;
     for (const ch of charactersIn(word.zh)) {

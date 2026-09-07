@@ -9,6 +9,7 @@ import {
   teachingOrder
 } from '../source/characters.js';
 import { newCard, BOX_COUNT } from '../source/srs.js';
+import { ALL_DECK_ID, deckWords } from '../source/vocab.js';
 
 const mastered = () => ({ ...newCard(), box: BOX_COUNT - 1 });
 
@@ -113,6 +114,38 @@ describe('the teachable set', () => {
   it('can name a word for every character it offers', () => {
     for (const char of allCharacters()) {
       expect(wordsUsing(char).length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('the deck narrows what there is to write', () => {
+  it('offers only the chosen deck’s characters', () => {
+    const food = availableCharacters({}, 'all', 'shiwu').map((entry) => entry.char);
+    expect(food).toContain('苹'); // 苹, from 苹果
+    expect(food).not.toContain('青'); // 青, only in other decks
+  });
+
+  it('offers every deck at once for the combined id', () => {
+    const all = availableCharacters({}, 'all', ALL_DECK_ID);
+    const food = availableCharacters({}, 'all', 'shiwu');
+    expect(all.length).toBeGreaterThan(food.length);
+  });
+
+  it('defaults to the combined deck when none is named', () => {
+    expect(availableCharacters({}, 'all').length).toBe(
+      availableCharacters({}, 'all', ALL_DECK_ID).length
+    );
+  });
+
+  it('applies the deck and the source together, not one or the other', () => {
+    const known = { '苹果': { ...newCard(), box: 2 } }; // 苹果
+    const chars = availableCharacters(known, 'known', 'shiwu').map((entry) => entry.char);
+    expect(chars.sort()).toEqual(['果', '苹'].sort()); // 果, 苹
+  });
+
+  it('draws the context word from the chosen deck', () => {
+    for (const entry of availableCharacters({}, 'all', 'shiwu')) {
+      expect(deckWords('shiwu').some((word) => word.zh === entry.from.zh)).toBe(true);
     }
   });
 });

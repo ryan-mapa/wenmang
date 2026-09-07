@@ -202,7 +202,7 @@ function renderScoreboard() {
   // The two right-hand tiles report whichever skill is being practised. In a
   // writing round "mastered words" is not the number anybody is watching.
   if (roundType === 'characters') {
-    const unlocked = availableCharacters(data.cards, data.prefs.characterSource).map((entry) => entry.char);
+    const unlocked = characterPool().map((entry) => entry.char);
     const charCards = unlocked.map((char) => data.chars[char] ?? newCard());
     ui.mastered.textContent = charCards.filter(isMastered).length;
     ui.mastery.textContent = `${Math.round(masteryOf(charCards) * 100)}%`;
@@ -222,6 +222,18 @@ function renderScoreboard() {
   }
 
   renderNote(streak);
+}
+
+/**
+ * The characters the current deck and source selection covers.
+ *
+ * One function rather than the same two arguments threaded through four call
+ * sites: the scoreboard, the round picker, the round itself and the summary all
+ * have to agree about what is on offer, and they disagreed the moment one of
+ * them was updated and another was not.
+ */
+function characterPool() {
+  return availableCharacters(data.cards, data.prefs.characterSource, ui.deck.value || ALL_DECK_ID);
 }
 
 /** The words the current deck and stage selection covers. */
@@ -279,7 +291,7 @@ function renderPracticeRow() {
   const open = availableRounds(data.cards);
   if (!open.includes(roundType)) roundType = 'words';
 
-  const unlocked = availableCharacters(data.cards, data.prefs.characterSource).length;
+  const unlocked = characterPool().length;
 
   ui.practiceRow.replaceChildren(
     ...[
@@ -308,7 +320,6 @@ function renderPracticeRow() {
   ui.stages.hidden = roundType !== 'words';
   ui.writingModes.hidden = roundType !== 'characters';
   ui.characterSource.value = data.prefs.characterSource;
-  ui.deck.closest('label').hidden = roundType === 'characters';
   ui.directionField.hidden = roundType !== 'words';
 }
 
@@ -535,7 +546,8 @@ function advance() {
 function startCharacterRound() {
   const items = buildCharacterRound(data.cards, data.chars, Date.now(), {
     preferredMode,
-    source: data.prefs.characterSource
+    source: data.prefs.characterSource,
+    deckId: ui.deck.value || ALL_DECK_ID
   });
 
   if (items.length === 0) {
@@ -867,7 +879,7 @@ function showSummary() {
     ui.summaryMastered.textContent = game.masteredCount();
     ui.summaryMasteredLabel.textContent = 'words mastered';
   } else {
-    const unlocked = availableCharacters(data.cards, data.prefs.characterSource).map((char) => data.chars[char.char] ?? newCard());
+    const unlocked = characterPool().map((entry) => data.chars[entry.char] ?? newCard());
     ui.summaryMastered.textContent = unlocked.filter(isMastered).length;
     ui.summaryMasteredLabel.textContent = 'characters you can write';
   }

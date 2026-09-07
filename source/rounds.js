@@ -13,6 +13,7 @@
 
 import { selectNext, newCard } from './srs.js';
 import { availableCharacters, writingSequence, strokesOf } from './characters.js';
+import { ALL_DECK_ID } from './vocab.js';
 import { suggestedMode } from './writing.js';
 import { ROUND_LENGTH as WORD_ROUND_LENGTH_SOURCE } from './game.js';
 
@@ -31,9 +32,9 @@ export function roundLength(type) {
   return type === 'characters' ? CHARACTER_ROUND_LENGTH : WORD_ROUND_LENGTH;
 }
 
-/** Whether the selected source contains any characters. */
-export function charactersReady(wordCards, source = 'all') {
-  return availableCharacters(wordCards, source).length > 0;
+/** Whether the chosen deck and source contain any characters at all. */
+export function charactersReady(wordCards, source = 'all', deckId = ALL_DECK_ID) {
+  return availableCharacters(wordCards, source, deckId).length > 0;
 }
 
 /**
@@ -61,9 +62,15 @@ export function charactersReady(wordCards, source = 'all') {
  * own.
  */
 export function buildCharacterRound(wordCards, charCards, now, options = {}) {
-  const { random = Math.random, length = CHARACTER_ROUND_LENGTH, preferredMode = null, source = 'all' } = options;
+  const {
+    random = Math.random,
+    length = CHARACTER_ROUND_LENGTH,
+    preferredMode = null,
+    source = 'all',
+    deckId = ALL_DECK_ID
+  } = options;
 
-  const available = availableCharacters(wordCards, source);
+  const available = availableCharacters(wordCards, source, deckId);
   if (available.length === 0) return [];
 
   const chosenWords = [];
