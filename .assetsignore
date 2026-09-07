@@ -1,12 +1,21 @@
+# Everything the Worker uploads as a static asset comes from the repo root, so
+# anything here that is not part of the site has to be named. Getting this wrong
+# publishes source and history, not just clutter.
+#
+# .wrangler is the one that bites: it holds the bundled Worker and its source
+# map, written fresh on every deploy. Left in, each deploy publishes another
+# copy of the build under a new path.
 .git
 .github
+.wrangler
 node_modules
-test
-tools
 worker
+tools
+test
 package.json
 package-lock.json
 vitest.config.js
 wrangler.toml
 .assetsignore
 .gitignore
+.DS_Store
