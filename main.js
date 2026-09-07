@@ -22,6 +22,8 @@ import {
   reviewCharacter, isSuccess, capExplanation
 } from './source/writing.js';
 import { hintAt, HINT_LEVELS } from './source/hints.js';
+import { SENTENCES } from './source/sentences.js';
+import { exampleFor, exampleLines, hasExample } from './source/examples.js';
 import { loadCharacter, writerOptions, demonstratesFirst, ATTRIBUTION } from './source/strokes.js';
 import { fetchMe, sync as pushPull, deleteAccount, signOut as endSession } from './source/api.js';
 import {
@@ -86,6 +88,9 @@ const ui = {
   directionHint: el('direction-hint'),
   prompt: el('prompt'),
   promptSub: el('prompt-sub'),
+  example: el('example'),
+  exampleToggle: el('example-toggle'),
+  exampleLines: el('example-lines'),
   speakPrompt: el('speak-prompt'),
   speakPromptDots: el('speak-prompt-dots'),
   choices: el('choices'),
@@ -175,6 +180,9 @@ let soundOn = data.prefs.sound;
 
 /** The clip currently playing, so a second tap can interrupt the first. */
 let playing = null;
+
+/** Whether the example is open on the current question. Reset per question. */
+let exampleShown = false;
 
 let roundCredited = false;
 let depthAtRoundStart = 0;
@@ -514,7 +522,9 @@ function renderQuestion() {
   ui.hint.innerHTML = 'Answer with <kbd>1</kbd>–<kbd>4</kbd> · <kbd>Enter</kbd> to continue';
   ui.hint.classList.remove('waiting');
   lastVoice = null;
+  exampleShown = false;
   renderPromptSpeaker();
+  renderExample();
   fitPrompt();
   bringBoardIntoView(ui.play);
 }
@@ -597,6 +607,7 @@ function submit(choice) {
   ui.feedback.className = `feedback ${result.correct ? 'good' : 'bad'}`;
 
   renderScoreboard();
+  renderExample();
   ui.roundProgress.style.width = `${(game.state.asked / game.state.roundLength) * 100}%`;
   bringBoardIntoView(ui.play);
 
@@ -1049,6 +1060,49 @@ ui.scoreboardNote.addEventListener('click', (event) => {
 });
 
 
+
+
+/**
+ * The example sentence, revealed on request.
+ *
+ * Hidden by default on purpose: a sentence sitting under every prompt would be
+ * read instead of the word, and recall is the thing being practised. Asking for
+ * it is the point — it turns the sentence into something you reach for when the
+ * word is genuinely ambiguous.
+ *
+ * Which lines may be shown is decided in source/examples.js, not here.
+ */
+function renderExample() {
+  const question = game?.state.question;
+  const answered = Boolean(game?.state.lastAnswer);
+  const lines = exampleLines(exampleFor(SENTENCES, question?.word.zh), question?.direction, answered);
+
+  // Cleared first, always. Returning early with the previous question's lines
+  // still in the DOM is how a stale sentence ends up under a new word.
+  ui.exampleLines.replaceChildren();
+
+  const offered = Boolean(question) && hasExample(SENTENCES, question.word, question.direction);
+  ui.example.hidden = !offered;
+  if (!offered) return;
+
+  ui.exampleLines.hidden = !exampleShown;
+  ui.exampleToggle.hidden = exampleShown;
+  if (!exampleShown) return;
+
+  ui.exampleLines.replaceChildren(
+    ...lines.map((line) => {
+      const p = document.createElement('p');
+      p.className = line.lang;
+      p.textContent = line.text;
+      return p;
+    })
+  );
+}
+
+ui.exampleToggle.addEventListener('click', () => {
+  exampleShown = true;
+  renderExample();
+});
 
 // ----------------------------------------------------------------- speech
 
