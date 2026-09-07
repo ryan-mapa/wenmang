@@ -11,7 +11,9 @@ import {
   localDay, streakFrom, recordRound, DAILY_GOAL, GRACE_DAYS, GUARD, guardEvent, manualGuardOn
 } from './source/goals.js';
 import { cycleScript, SCRIPT_LABELS, SCRIPT_DESCRIPTIONS, displayWord } from './source/script.js';
-import { buildCharacterRound, availableRounds, CHARACTER_ROUND_LENGTH } from './source/rounds.js';
+import {
+  buildCharacterRound, availableRounds, charactersInRound, CHARACTER_ROUND_LENGTH
+} from './source/rounds.js';
 import { availableCharacters, characterInfo } from './source/characters.js';
 import {
   MODES, MODE_LABELS, MODE_DESCRIPTIONS, newAttempt, recordStroke, takeHint,
@@ -69,6 +71,8 @@ const ui = {
   stageRow: el('stage-row'),
   unlockNote: el('unlock-note'),
   writingModes: el('writing-modes'),
+  characterSource: el('character-source'),
+  characterEmpty: el('character-empty'),
   modeRow: el('mode-row'),
   modeNote: el('mode-note'),
 
@@ -84,7 +88,7 @@ const ui = {
   writeHint: el('write-hint'),
   charGloss: el('char-gloss'),
   charContext: el('char-context'),
-  pad: el('pad'),
+  padRow: el('pad-row'),
   charFeedback: el('char-feedback'),
   charHintBtn: el('char-hint-btn'),
   showAgain: el('show-again'),
@@ -152,8 +156,8 @@ const cards = () => (game ? game.state.cards : data.cards);
 // ------------------------------------------------------------------ chrome
 
 function populateDecks() {
-  const selected = ui.deck.value || DECKS[0].id;
-  const entries = [...DECKS, { id: ALL_DECK_ID, name: 'Everything', emoji: '全' }];
+  const selected = ui.deck.value || ALL_DECK_ID;
+  const entries = [{ id: ALL_DECK_ID, name: 'Everything', emoji: '全' }, ...DECKS];
 
   ui.deck.replaceChildren(
     ...entries.map((deck) => {
@@ -198,14 +202,14 @@ function renderScoreboard() {
   // The two right-hand tiles report whichever skill is being practised. In a
   // writing round "mastered words" is not the number anybody is watching.
   if (roundType === 'characters') {
-    const unlocked = availableCharacters(data.cards).map((entry) => entry.char);
+    const unlocked = availableCharacters(data.cards, data.prefs.characterSource).map((entry) => entry.char);
     const charCards = unlocked.map((char) => data.chars[char] ?? newCard());
     ui.mastered.textContent = charCards.filter(isMastered).length;
     ui.mastery.textContent = `${Math.round(masteryOf(charCards) * 100)}%`;
     ui.masteredStat.dataset.tip =
       'Characters you can write from a blank pad — the top box, which tracing cannot reach.';
     ui.masteryStat.dataset.tip =
-      'How far your unlocked characters have climbed overall, counting partial progress on every one.';
+      'How far characters in this source have climbed overall, counting partial progress on every one.';
   } else {
     const pool = poolWords();
     const wordCards = pool.map((word) => data.cards[word.zh] ?? newCard());
@@ -222,7 +226,7 @@ function renderScoreboard() {
 
 /** The words the current deck and stage selection covers. */
 function poolWords() {
-  const deckId = ui.deck.value || DECKS[0].id;
+  const deckId = ui.deck.value || ALL_DECK_ID;
   const open = stages.filter((stage) => isStageUnlocked(deckId, stage, data.cards));
   const seen = new Set();
   const out = [];
@@ -275,7 +279,7 @@ function renderPracticeRow() {
   const open = availableRounds(data.cards);
   if (!open.includes(roundType)) roundType = 'words';
 
-  const unlocked = availableCharacters(data.cards).length;
+  const unlocked = availableCharacters(data.cards, data.prefs.characterSource).length;
 
   ui.practiceRow.replaceChildren(
     ...[
@@ -283,7 +287,7 @@ function renderPracticeRow() {
       {
         id: 'characters',
         name: 'Characters',
-        meta: unlocked ? `${CHARACTER_ROUND_LENGTH} to write · ${unlocked} unlocked` : 'master a word to open'
+        meta: `${Math.min(CHARACTER_ROUND_LENGTH, unlocked)} to write · ${unlocked} available`
       }
     ].map((type) => {
       const button = document.createElement('button');
@@ -303,11 +307,13 @@ function renderPracticeRow() {
 
   ui.stages.hidden = roundType !== 'words';
   ui.writingModes.hidden = roundType !== 'characters';
+  ui.characterSource.value = data.prefs.characterSource;
+  ui.deck.closest('label').hidden = roundType === 'characters';
   ui.directionField.hidden = roundType !== 'words';
 }
 
 function renderStages() {
-  const deckId = ui.deck.value || DECKS[0].id;
+  const deckId = ui.deck.value || ALL_DECK_ID;
 
   ui.stageRow.replaceChildren(
     ...Array.from({ length: STAGE_COUNT }, (_, stage) => {
@@ -384,7 +390,7 @@ function renderModes() {
 // ------------------------------------------------------------- word rounds
 
 function startWordRound() {
-  const deckId = ui.deck.value || DECKS[0].id;
+  const deckId = ui.deck.value || ALL_DECK_ID;
   const open = stages.filter((stage) => isStageUnlocked(deckId, stage, data.cards));
   const usable = open.filter(
     (stage) => stageProgress(deckId, stage, data.cards).total > 0
@@ -521,48 +527,130 @@ function advance() {
 // -------------------------------------------------------- character rounds
 
 function startCharacterRound() {
-  const items = buildCharacterRound(data.cards, data.chars, Date.now(), { preferredMode });
+  const items = buildCharacterRound(data.cards, data.chars, Date.now(), {
+    preferredMode,
+    source: data.prefs.characterSource
+  });
+
   if (items.length === 0) {
-    roundType = 'words';
-    renderPracticeRow();
-    return startWordRound();
+    charRound = null;
+    game = null;
+    ui.play.hidden = true;
+    ui.write.hidden = true;
+    ui.summary.hidden = true;
+    ui.characterEmpty.hidden = false;
+    ui.roundProgress.style.width = '0%';
+    renderScoreboard();
+    return;
   }
 
-  charRound = { items, index: 0, right: 0, attempt: null, hintLevel: 0, startedAt: Date.now() };
+  charRound = {
+    items,
+    index: 0,
+    charIndex: 0,
+    written: 0,
+    right: 0,
+    total: charactersInRound(items),
+    attempt: null,
+    hintLevel: 0,
+    startedAt: Date.now(),
+    // Bumped whenever the round moves on. Every async step checks it before
+    // touching the DOM, so a slow character-data fetch cannot draw itself onto
+    // a pad that has since moved to the next word.
+    generation: 0
+  };
   game = null;
 
   ui.play.hidden = true;
   ui.write.hidden = false;
   ui.summary.hidden = true;
-  renderCharacter();
+  renderWord();
 }
 
-async function renderCharacter() {
-  const item = charRound.items[charRound.index];
-  const info = characterInfo(item.char);
+/** The word being written, and the character within it. */
+const currentWord = () => charRound.items[charRound.index];
+const currentChar = () => currentWord().chars[charRound.charIndex];
 
-  charRound.attempt = newAttempt(item.char, item.mode);
+/**
+ * Lay out one square per character of the word and start the first unwritten
+ * one.
+ *
+ * The whole row is rebuilt per word rather than per character: the row is the
+ * word, and rebuilding it as you move along it would make the word flicker
+ * under the hand that is writing it.
+ */
+async function renderWord() {
+  const item = currentWord();
+  const generation = ++charRound.generation;
+
+  charRound.charIndex = 0;
   charRound.hintLevel = 0;
 
   renderScoreboard();
-  ui.roundProgress.style.width = `${(charRound.index / charRound.items.length) * 100}%`;
+  ui.roundProgress.style.width = `${(charRound.written / charRound.total) * 100}%`;
   ui.charFeedback.textContent = ' ';
   ui.charFeedback.className = 'feedback';
   ui.charHintBtn.disabled = false;
-  ui.writeHint.textContent = MODE_LABELS[item.mode];
+  ui.writeHint.textContent = MODE_LABELS[item.chars[0].mode];
 
-  // The prompt is the meaning, never the character — on a blank pad the
-  // character is the answer, so showing it in the context word gives it away.
-  const hide = item.mode === 'free';
-  ui.charGloss.textContent = item.from.en;
-  ui.charContext.innerHTML =
-    `<b>${hide ? item.from.zh.replaceAll(item.char, '□') : item.from.zh}</b> · ${item.from.py}` +
-    (info.strokes ? ` · ${info.strokes} strokes` : '');
+  // The prompt is the meaning and the sound; the characters are the answer.
+  ui.charGloss.textContent = item.word.en;
+  ui.charContext.textContent = item.word.py;
 
-  ui.pad.replaceChildren();
+  ui.padRow.style.setProperty('--pad-count', item.chars.length);
+  ui.padRow.replaceChildren(
+    ...item.chars.map((_, position) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'pad-wrap ' + (position === 0 ? 'is-active' : 'is-pending');
+      const grid = document.createElement('div');
+      grid.className = 'pad-grid';
+      grid.setAttribute('aria-hidden', 'true');
+      const pad = document.createElement('div');
+      pad.className = 'pad';
+      wrap.append(grid, pad);
+      return wrap;
+    })
+  );
+
+  if (charRound.generation !== generation) return;
+  activateChar();
+}
+
+/** Put a live writer on the current square and take strokes on it. */
+async function activateChar() {
+  const generation = charRound.generation;
+  const item = currentWord();
+  const entry = currentChar();
+  const info = characterInfo(entry.char);
+
+  charRound.attempt = newAttempt(entry.char, entry.mode);
+  charRound.hintLevel = 0;
+  ui.charHintBtn.disabled = false;
+  ui.writeHint.textContent = MODE_LABELS[entry.mode];
+
+  const wraps = [...ui.padRow.children];
+  wraps.forEach((wrap, position) => {
+    wrap.classList.toggle('is-active', position === charRound.charIndex);
+    wrap.classList.toggle('is-pending', position > charRound.charIndex);
+    wrap.classList.toggle('is-done', position < charRound.charIndex);
+  });
+
+  // Which character of the word, and how long it is — the row shows where you
+  // are, this says what is being asked for.
+  ui.charContext.textContent =
+    item.chars.length > 1
+      ? `${item.word.py} · character ${charRound.charIndex + 1} of ${item.chars.length}` +
+        (info.strokes ? ` · ${info.strokes} strokes` : '')
+      : `${item.word.py}${info.strokes ? ` · ${info.strokes} strokes` : ''}`;
+
+  const pad = wraps[charRound.charIndex]?.querySelector('.pad');
+  if (!pad) return;
+  pad.replaceChildren();
   writer = null;
 
-  const charData = await loadCharacter(item.char);
+  const charData = await loadCharacter(entry.char);
+  if (charRound?.generation !== generation) return;
+
   if (!charData || !globalThis.HanziWriter) {
     // No geometry: the round still runs on the structural hints, and the
     // learner marks themselves rather than being blocked.
@@ -572,16 +660,17 @@ async function renderCharacter() {
   }
 
   ui.skip.textContent = 'Skip';
-  writer = globalThis.HanziWriter.create(ui.pad, item.char, {
-    ...writerOptions(item.mode, { size: ui.pad.clientWidth || 300 }),
+  writer = globalThis.HanziWriter.create(pad, entry.char, {
+    ...writerOptions(entry.mode, { size: pad.clientWidth || 300 }),
     charDataLoader: (_char, onComplete) => onComplete(charData)
   });
 
-  if (demonstratesFirst(item.mode)) await writer.animateCharacter();
-  startQuiz(item, charData);
+  if (demonstratesFirst(entry.mode)) await writer.animateCharacter();
+  if (charRound?.generation !== generation) return;
+  startQuiz(entry, charData);
 }
 
-function startQuiz(item, charData) {
+function startQuiz(entry, charData) {
   writer.quiz({
     onMistake: () => {
       charRound.attempt = recordStroke(charRound.attempt, false, charData.strokes.length);
@@ -589,42 +678,60 @@ function startQuiz(item, charData) {
     onCorrectStroke: () => {
       charRound.attempt = recordStroke(charRound.attempt, true, charData.strokes.length);
     },
-    onComplete: () => finishCharacter(item)
+    onComplete: () => finishChar(entry)
   });
 }
 
-function finishCharacter(item) {
+/** Score the character just written, then move along the word. */
+function finishChar(entry) {
+  if (!charRound || entry.done) return;
+  entry.done = true;
+
+  const generation = charRound.generation;
   const now = Date.now();
-  const card = data.chars[item.char] ?? newCard();
+  const card = data.chars[entry.char] ?? newCard();
   const success = isSuccess(charRound.attempt);
 
-  data = store.withChars(data, { ...data.chars, [item.char]: reviewCharacter(card, charRound.attempt, now) });
+  data = store.withChars(data, {
+    ...data.chars,
+    [entry.char]: reviewCharacter(card, charRound.attempt, now)
+  });
 
   // The mode travels with the review. Without it the server could not replay
   // the caps, and would have to guess — in the direction that flatters.
   store.queueReview({
     id: store.newReviewId(),
     kind: 'char',
-    item: item.char,
-    mode: item.mode,
+    item: entry.char,
+    mode: entry.mode,
     correct: success,
     reviewedAt: now
   });
   persist();
 
+  charRound.written += 1;
   if (success) charRound.right += 1;
 
-  const explanation = capExplanation(data.chars[item.char], item.mode);
+  const explanation = capExplanation(data.chars[entry.char], entry.mode);
   ui.charFeedback.innerHTML = success
-    ? `<span class="han">${item.char}</span> — ${explanation ?? 'good.'}`
-    : `<span class="han">${item.char}</span> — worth another look.`;
+    ? `<span class="han">${entry.char}</span> — ${explanation ?? 'good.'}`
+    : `<span class="han">${entry.char}</span> — worth another look.`;
   ui.charFeedback.className = `feedback ${success ? 'good' : 'bad'}`;
+  ui.roundProgress.style.width = `${(charRound.written / charRound.total) * 100}%`;
+
+  const lastOfWord = charRound.charIndex + 1 >= currentWord().chars.length;
 
   setTimeout(() => {
+    if (!charRound || charRound.generation !== generation || roundType !== 'characters') return;
+
+    if (!lastOfWord) {
+      charRound.charIndex += 1;
+      return activateChar();
+    }
     charRound.index += 1;
     if (charRound.index >= charRound.items.length) return showSummary();
-    renderCharacter();
-  }, 1200);
+    renderWord();
+  }, lastOfWord ? 900 : 550);
 }
 
 async function useHint() {
@@ -651,19 +758,27 @@ ui.showAgain.addEventListener('click', async () => {
   // In the teaching mode watching the animation *is* the mode. In the other two
   // it hands over the whole character, so it costs a hint.
   if (charRound.attempt.mode !== 'teach') charRound.attempt = takeHint(charRound.attempt);
+
+  const generation = charRound.generation;
   await writer.animateCharacter();
-  const item = charRound.items[charRound.index];
-  const charData = await loadCharacter(item.char);
-  if (charData) startQuiz(item, charData);
+  if (charRound?.generation !== generation) return;
+
+  const entry = currentChar();
+  const charData = await loadCharacter(entry.char);
+  if (charData && charRound?.generation === generation) startQuiz(entry, charData);
 });
 
 ui.skip.addEventListener('click', () => {
-  if (charRound && !ui.write.hidden) finishCharacter(charRound.items[charRound.index]);
+  if (charRound && !ui.write.hidden) finishChar(currentChar());
 });
 
 // ---------------------------------------------------------------- rounds
 
 function startRound() {
+  ui.characterEmpty.hidden = true;
+  charRound = null;
+  writer?.cancelQuiz();
+  writer = null;
   roundCredited = false;
   populateDecks();
   renderPracticeRow();
@@ -716,7 +831,7 @@ function showSummary() {
   roundCredited = true;
 
   const wasWords = roundType === 'words';
-  const asked = wasWords ? game.state.asked : charRound.items.length;
+  const asked = wasWords ? game.state.asked : charRound.total;
   const correct = wasWords ? game.state.correct : charRound.right;
 
   const streaks = creditRound({
@@ -746,7 +861,7 @@ function showSummary() {
     ui.summaryMastered.textContent = game.masteredCount();
     ui.summaryMasteredLabel.textContent = 'words mastered';
   } else {
-    const unlocked = availableCharacters(data.cards).map((char) => data.chars[char.char] ?? newCard());
+    const unlocked = availableCharacters(data.cards, data.prefs.characterSource).map((char) => data.chars[char.char] ?? newCard());
     ui.summaryMastered.textContent = unlocked.filter(isMastered).length;
     ui.summaryMasteredLabel.textContent = 'characters you can write';
   }
@@ -1058,6 +1173,12 @@ function sayShared(text) {
 ui.share.addEventListener('click', share);
 
 // --------------------------------------------------------------- settings
+
+ui.characterSource.addEventListener('change', () => {
+  data = store.withPrefs(data, { characterSource: ui.characterSource.value });
+  persist();
+  startRound();
+});
 
 ui.deck.addEventListener('change', () => {
   stages = [0];

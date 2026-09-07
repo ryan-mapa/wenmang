@@ -32,7 +32,7 @@ describe('an empty start', () => {
   });
 
   it('gives usable default preferences', () => {
-    expect(load().prefs).toEqual({ script: 'hanzi', mode: 'auto' });
+    expect(load().prefs).toEqual({ script: 'hanzi', mode: 'auto', characterSource: 'all' });
   });
 });
 
@@ -51,13 +51,13 @@ describe('round trips', () => {
   });
 
   it('persists preferences', () => {
-    save(withPrefs(load(), { script: 'both', mode: 'free' }));
-    expect(load().prefs).toEqual({ script: 'both', mode: 'free' });
+    save(withPrefs(load(), { script: 'both', mode: 'free', characterSource: 'known' }));
+    expect(load().prefs).toEqual({ script: 'both', mode: 'free', characterSource: 'known' });
   });
 
   it('repairs a preference that is no longer valid', () => {
-    save(withPrefs(load(), { script: 'zhuyin', mode: 'tracing' }));
-    expect(load().prefs).toEqual({ script: 'hanzi', mode: 'auto' });
+    save(withPrefs(load(), { script: 'zhuyin', mode: 'tracing', characterSource: 'invalid' }));
+    expect(load().prefs).toEqual({ script: 'hanzi', mode: 'auto', characterSource: 'all' });
   });
 });
 

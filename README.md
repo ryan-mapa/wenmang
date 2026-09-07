@@ -1,8 +1,14 @@
+<p align="center">
+  <a href="https://wenmang.ryan-mapa.dev"><img src="assets/branding/wenmang-seal.svg" width="96" height="96" alt="Wenmang jade seal with the character 文" /></a>
+</p>
+
 # 文盲 Wenmang
 
+[Play Wenmang](https://wenmang.ryan-mapa.dev)
+
 A Mandarin vocabulary game that turns into a handwriting trainer. Words first,
-in multiple choice with Leitner-box spaced repetition; then the characters
-inside the words you have mastered, drawn stroke by stroke on a 米字格 pad.
+in multiple choice with Leitner-box spaced repetition; then characters drawn stroke by stroke on a 米字格 pad. Everything is the
+first and default vocabulary category.
 
 The name means *illiterate* — literally "writing-blind". It is meant as a joke
 about where you start. Worth knowing that in Chinese it is a blunt word, used
@@ -45,9 +51,11 @@ can be studied together rather than one or the other.
 characters alone, deliberately: pinyin shown beside a character gets read
 *instead of* it, and the round teaches you nothing you did not already know.
 
-**Characters unlock from words.** A character becomes available to write once
-you have mastered a word containing it. Producing 苹 from a blank pad is a
-memory task with nothing to hold on to unless 苹果 already means apple to you.
+**Characters are always open.** Choose **All words** (the default) to practise
+characters from the full vocabulary, or **Known words** for words whose latest
+answer was correct (box 1 or higher). This choice is saved on this browser.
+Characters retain an example word for context. An empty Known words selection
+explains how to start rather than locking the Characters tab.
 
 **Writing has three modes**, and one rule that matters:
 
@@ -167,6 +175,11 @@ from Unihan under the Unicode License. `source/strokes.js` is the only module
 that touches the stroke data, so the source can be swapped in one file.
 
 ## Look
+
+The logo is a jade seal containing 文 (writing), the first character of 文盲.
+The [SVG master](assets/branding/wenmang-seal.svg) is used in the header and
+browser tab. For Google Cloud branding, upload the square
+[256 × 256 PNG](assets/branding/wenmang-google-cloud.png).
 
 One screen, dark, laid out like its sibling
 [Vocabulario](https://vocabulario.ryan-mapa.dev): a settings row, four stat

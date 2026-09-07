@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>文盲 Wenmang — Mandarin words and characters</title>
   <meta name="description" content="Learn Mandarin vocabulary and how to write the characters by hand, with spaced repetition." />
+  <link rel="icon" type="image/svg+xml" href="/assets/branding/wenmang-seal.svg" />
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.7.3/dist/hanzi-writer.min.js" defer></script>
 </head>
@@ -12,21 +13,7 @@
   <main class="app">
     <header class="topbar">
       <div class="brand">
-        <!-- Inline rather than an <img>, so the mark takes the page's colors.
-             A 田字格 with a brush stroke through it: the practice square every
-             Chinese exercise book is ruled with. -->
-        <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
-          <defs>
-            <linearGradient id="wmark" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#2f9fb5"/>
-              <stop offset="1" stop-color="#4fbf8b"/>
-            </linearGradient>
-          </defs>
-          <rect x="7" y="7" width="50" height="50" rx="7" fill="none" stroke="#26343a" stroke-width="3"/>
-          <path d="M32 7v50M7 32h50" stroke="#26343a" stroke-width="1.5" stroke-dasharray="4 4"/>
-          <path d="M19 21 Q32 34 27 47" fill="none" stroke="url(#wmark)" stroke-width="8" stroke-linecap="round"/>
-          <path d="M30 25 L46 41" fill="none" stroke="url(#wmark)" stroke-width="7" stroke-linecap="round"/>
-        </svg>
+        <img class="brand-mark" src="assets/branding/wenmang-seal.svg" width="30" height="30" alt="" />
         <h1 class="wordmark" translate="no">文盲</h1>
         <span class="wordmark-latin">Wenmang</span>
       </div>
@@ -110,8 +97,7 @@
 
     <div class="progress" aria-hidden="true"><div class="progress-fill" id="round-progress"></div></div>
 
-    <!-- What kind of round. Words are always open; characters unlock from the
-         words you have mastered. -->
+    <!-- Both word and character practice are available from the start. -->
     <section class="practice" aria-label="Practice">
       <div class="practice-row" id="practice-row" role="group" aria-label="Round type"></div>
     </section>
@@ -122,6 +108,14 @@
     </section>
 
     <section class="stages" id="writing-modes" aria-label="Writing mode" hidden>
+      <label class="field">
+        <span>Characters from</span>
+        <select id="character-source" aria-describedby="character-source-note">
+          <option value="all">All words</option>
+          <option value="known">Known words</option>
+        </select>
+      </label>
+      <p class="unlock-note" id="character-source-note">Known words are words whose latest answer was correct. All words includes the full vocabulary.</p>
       <div class="mode-row" id="mode-row" role="group" aria-label="Choose a writing mode"></div>
       <p class="unlock-note" id="mode-note"></p>
     </section>
@@ -138,15 +132,17 @@
       <p class="hint" id="hint">Answer with <kbd>1</kbd>–<kbd>4</kbd> · <kbd>Enter</kbd> to continue</p>
     </section>
 
+    <section class="card" id="character-empty" role="status" hidden>
+      <p>No known words yet. Answer a word correctly or choose All words to start writing now.</p>
+    </section>
+
     <!-- Character writing -->
     <section class="card" id="write" hidden>
       <p class="direction-hint" id="write-hint">Write it…</p>
       <p class="char-gloss" id="char-gloss"></p>
       <p class="char-context" id="char-context" translate="no"></p>
-      <div class="pad-wrap">
-        <div class="pad-grid" aria-hidden="true"></div>
-        <div class="pad" id="pad"></div>
-      </div>
+      <!-- One square per character of the word, built in main.js. -->
+      <div class="pad-row" id="pad-row"></div>
       <p class="feedback" id="char-feedback" role="status" aria-live="polite"></p>
       <div class="char-tools">
         <button class="ghost" id="char-hint-btn" type="button">Hint</button>

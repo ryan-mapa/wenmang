@@ -372,15 +372,40 @@ button.stat { cursor: pointer; }
 .char-context { margin: 5px 0 16px; font-size: 14px; color: var(--muted); }
 .char-context b { color: var(--ink-soft); font-weight: 500; font-family: var(--han); font-size: 16px; }
 
+/* One square per character, in reading order — the row *is* the word. A
+   single-character word gets one big square; a four-character idiom gets four
+   smaller ones, because the row has to stay on one line at phone width for the
+   word to read as a word rather than as a list. */
+.pad-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* The squares share the row equally and cap at a comfortable size, so a
+   one-character word gets a big square and a four-character idiom four smaller
+   ones — without either overflowing the card. Sized from the row rather than
+   from the viewport: the card has a max-width, so viewport maths gets it wrong
+   on a wide screen. */
 .pad-wrap {
   position: relative;
-  width: min(300px, 78vw);
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 300px;
   aspect-ratio: 1;
-  margin: 0 auto;
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 12px;
+  transition: border-color 0.2s ease, opacity 0.2s ease;
 }
+
+/* Where you are in the word. The active square is the only one that takes
+   strokes; the ones behind it keep what you wrote, and the ones ahead stay
+   quiet so the eye goes to the right place. */
+.pad-wrap.is-active { border-color: var(--jade); }
+.pad-wrap.is-pending { opacity: 0.45; }
+.pad-wrap.is-done { border-color: var(--line); }
 
 /* The 米字格 — the crossed practice grid every Chinese exercise book is ruled
    with. Not decoration: proportion and placement are most of what makes

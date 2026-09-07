@@ -23,28 +23,36 @@ describe('pulling characters out of words', () => {
   });
 });
 
-describe('availability follows mastered vocabulary', () => {
+describe('character sources', () => {
   it('offers nothing at the start', () => {
-    expect(availableCharacters({})).toEqual([]);
+    expect(availableCharacters({}, 'known')).toEqual([]);
   });
 
   it('unlocks both characters of a mastered two-character word', () => {
-    const unlocked = availableCharacters({ 苹果: mastered() });
+    const unlocked = availableCharacters({ 苹果: mastered() }, 'known');
     expect(unlocked.map((entry) => entry.char).sort()).toEqual(['果', '苹']);
   });
 
-  it('ignores a word that is merely in progress', () => {
-    expect(availableCharacters({ 苹果: { ...newCard(), box: BOX_COUNT - 2 } })).toEqual([]);
+  it('includes a word after one correct answer without requiring mastery', () => {
+    expect(availableCharacters({ 苹果: { ...newCard(), box: 1 } }, 'known').map(x => x.char).sort()).toEqual(['果', '苹']);
+  });
+
+  it('excludes a word after a miss even if it was previously correct', () => {
+    expect(availableCharacters({ 苹果: { ...newCard(), box: 0, correct: 3, seen: 4 } }, 'known')).toEqual([]);
+  });
+
+  it('offers every vocabulary character by default without word progress', () => {
+    expect(availableCharacters({}).map(x => x.char).sort()).toEqual(allCharacters());
   });
 
   it('remembers which word earned each character', () => {
-    const [entry] = availableCharacters({ 苹果: mastered() });
+    const [entry] = availableCharacters({ 苹果: mastered() }, 'known');
     expect(entry.from.zh).toBe('苹果');
     expect(entry.from.en).toBe('apple');
   });
 
   it('credits a shared character to one word only', () => {
-    const unlocked = availableCharacters({ 妈妈: mastered(), 好: mastered() });
+    const unlocked = availableCharacters({ 妈妈: mastered(), 好: mastered() }, 'known');
     const chars = unlocked.map((entry) => entry.char);
     expect(new Set(chars).size).toBe(chars.length);
   });

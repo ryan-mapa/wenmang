@@ -60,7 +60,7 @@ const EMPTY = {
   chars: {},
   days: {},
   guards: [],
-  prefs: { script: DEFAULT_SCRIPT, mode: AUTO_MODE },
+  prefs: { script: DEFAULT_SCRIPT, mode: AUTO_MODE, characterSource: 'all' },
   syncedAt: 0
 };
 
@@ -133,7 +133,8 @@ function readPrefs(raw) {
     script: normalizeScript(raw?.script),
     // Anything unrecognised falls back to auto rather than to a writing mode:
     // a corrupt preference must not quietly pin someone to tracing forever.
-    mode: isMode(raw?.mode) ? raw.mode : AUTO_MODE
+    mode: isMode(raw?.mode) ? raw.mode : AUTO_MODE,
+    characterSource: raw?.characterSource === 'known' ? 'known' : 'all'
   };
 }
 

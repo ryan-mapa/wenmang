@@ -1,24 +1,34 @@
-// The bridge from knowing words to writing characters.
-//
-// A character becomes available to learn once you have mastered a word that
-// contains it. That ordering is the point: writing 苹 from a blank pad is a
-// memory task with nothing to hold on to unless 苹果 already means apple to
-// you. Meaning first, then the hand.
-//
-// It also keeps the writing set honest. There are tens of thousands of
-// characters and no learner needs them in the abstract; they need the ones
-// inside the words they actually use. So this module never lists a character
-// the learner has no reason for — the inventory grows out of their own
-// vocabulary, and every character in it can name the word that earned it.
+// Character practice draws from all vocabulary or words currently answered correctly.
+// Every character retains a vocabulary word for context.
 
 import { allWords } from './vocab.js';
 import { CHARACTER_DATA } from './character-data.js';
 import { getRadical, formsOf } from './radicals.js';
-import { newCard, isMastered } from './srs.js';
+import { newCard } from './srs.js';
 
 /** Han characters in a string, in order, keeping duplicates out. */
 export function charactersIn(text) {
   return [...new Set([...String(text)].filter((ch) => /\p{Script=Han}/u.test(ch)))];
+}
+
+/**
+ * The characters of a word in writing order, keeping repeats.
+ *
+ * Deliberately not `charactersIn`, which dedupes. Writing 妈妈 means writing 妈
+ * twice, and a pad row that showed one square for a two-character word would be
+ * showing the wrong word. Repeats matter here in a way they do not when asking
+ * "which characters does this learner have access to".
+ */
+export function writingSequence(word) {
+  return [...word.zh].filter((ch) => /\p{Script=Han}/u.test(ch));
+}
+
+/** Total strokes to write a whole word, for ordering a round simple to complex. */
+export function strokesOf(word) {
+  return writingSequence(word).reduce(
+    (total, ch) => total + (CHARACTER_DATA[ch]?.strokes ?? 0),
+    0
+  );
 }
 
 /** Every character the app could ever teach, because a deck word uses it. */
@@ -32,17 +42,17 @@ export function wordsUsing(char) {
 }
 
 /**
- * Characters unlocked by mastered vocabulary, with the word that unlocked each.
+ * Characters from all words, or known words (a current box above zero).
  *
  * `wordCards` is the vocabulary card map — writing progress lives in a separate
  * map and is deliberately not consulted here. Availability is a question about
  * what you understand, not about what you have already practised writing.
  */
-export function availableCharacters(wordCards) {
+export function availableCharacters(wordCards, source = 'all') {
   const unlocked = new Map();
   for (const word of allWords()) {
     const card = wordCards[word.zh] ?? newCard();
-    if (!isMastered(card)) continue;
+    if (source === 'known' && card.box <= 0) continue;
     for (const ch of charactersIn(word.zh)) {
       if (!unlocked.has(ch)) unlocked.set(ch, word);
     }
