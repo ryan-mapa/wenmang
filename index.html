@@ -52,7 +52,7 @@
         <label class="field field-direction" id="direction-field">
           <span>Direction</span>
           <select id="direction" translate="no">
-            <option value="mixed" data-full="Mixed (recommended)" data-short="Mixed">Mixed (recommended)</option>
+            <option value="mixed">Mixed</option>
             <option value="zh-en">中文 → English</option>
             <option value="en-zh">English → 中文</option>
           </select>
@@ -65,13 +65,14 @@
         <button class="shield" id="guard-shield" type="button" title="Streak guard">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M12 3 5 5.6v5.7c0 4.3 3 8.3 7 9.4 4-1.1 7-5.1 7-9.4V5.6L12 3z"/>
+            <path class="pause" d="M10.3 9.5v5M13.7 9.5v5"/>
           </svg>
           <span class="shield-label">Streak guard</span>
         </button>
       </div>
     </header>
 
-    <section class="scoreboard" aria-label="Progress">
+    <section class="scoreboard" id="scoreboard" aria-label="Progress">
       <div class="stat" id="today-stat" tabindex="0"
            data-tip="Rounds you have finished today. Five meets the daily goal — about ten minutes. Word rounds and character rounds both count.">
         <span class="stat-value" id="today">0/5</span><span class="stat-label">today</span>
@@ -84,7 +85,7 @@
         <span class="guard-badge" id="guard-badge" aria-hidden="true"></span>
       </button>
       <div class="stat" tabindex="0" id="mastered-stat"
-           data-tip="Words in this deck and stage you have reached the top box on — four correct answers in a row, with no miss in between.">
+           data-tip="Words in this deck and stage you have fully learned — four correct answers in a row, with no miss in between.">
         <span class="stat-value" id="mastered">0</span><span class="stat-label">mastered</span>
       </div>
       <div class="stat" tabindex="0" id="mastery-stat"

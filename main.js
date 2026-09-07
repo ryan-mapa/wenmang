@@ -5,7 +5,9 @@ import { DECKS, ALL_DECK_ID, STAGE_NAMES, STAGE_COUNT, getDeck } from './source/
 import { newCard, isMastered, masteryOf } from './source/srs.js';
 import { createGame, MIXED, ROUND_LENGTH } from './source/game.js';
 import { DIRECTIONS } from './source/quiz.js';
-import { isStageUnlocked, stageProgress, unlockedDepth, nextUnlock } from './source/stages.js';
+import {
+  isStageUnlocked, stageProgress, unlockedDepth, commonDepth, nextUnlock
+} from './source/stages.js';
 import * as store from './source/storage.js';
 import {
   localDay, streakFrom, recordRound, DAILY_GOAL, GRACE_DAYS, GUARD, guardEvent, manualGuardOn
@@ -66,6 +68,7 @@ const ui = {
   scoreboardNote: el('scoreboard-note'),
   roundProgress: el('round-progress'),
 
+  scoreboard: el('scoreboard'),
   practiceRow: el('practice-row'),
   stages: el('stages'),
   stageRow: el('stage-row'),
@@ -163,20 +166,25 @@ function populateDecks() {
     ...entries.map((deck) => {
       const option = document.createElement('option');
       option.value = deck.id;
-      const total = deck.id === ALL_DECK_ID
-        ? DECKS.reduce((n, d) => n + d.stages.flat().length, 0)
-        : deck.stages.flat().length;
-      const done = wordsOf(deck.id).filter((word) => isMastered(data.cards[word.zh] ?? newCard())).length;
-      option.textContent = `${deck.emoji} ${deck.name} · ${done}/${total}`;
+      // Filled stars show how deep the deck is open, at a glance in the list.
+      // The filled one is the emoji star rather than U+2605 because option text
+      // cannot be styled per-character — an emoji carries its own colour.
+      //
+      // "Everything" reports the depth every category shares, not the deepest
+      // one reached anywhere: a star there claims the whole thing is open, and
+      // one category racing ahead would show progress nobody has made.
+      //
+      // A count was here before and read badly — "全 Everything · 0/1760" is
+      // most of a select's width spent on a number that barely moves.
+      const depth = deck.id === ALL_DECK_ID
+        ? commonDepth(data.cards)
+        : unlockedDepth(deck.id, data.cards);
+      const stars = STAGE_NAMES.map((_, i) => (i <= depth ? '⭐' : '☆')).join('');
+      option.textContent = `${deck.emoji} ${deck.name}  ${stars}`;
       return option;
     })
   );
   ui.deck.value = selected;
-}
-
-function wordsOf(deckId) {
-  if (deckId === ALL_DECK_ID) return DECKS.flatMap((deck) => deck.stages.flat());
-  return getDeck(deckId)?.stages.flat() ?? [];
 }
 
 function renderScriptToggle() {
@@ -207,7 +215,7 @@ function renderScoreboard() {
     ui.mastered.textContent = charCards.filter(isMastered).length;
     ui.mastery.textContent = `${Math.round(masteryOf(charCards) * 100)}%`;
     ui.masteredStat.dataset.tip =
-      'Characters you can write from a blank pad — the top box, which tracing cannot reach.';
+      'Characters you can write from memory on a blank pad. Tracing alone never gets one here.';
     ui.masteryStat.dataset.tip =
       'How far characters in this source have climbed overall, counting partial progress on every one.';
   } else {
@@ -216,7 +224,7 @@ function renderScoreboard() {
     ui.mastered.textContent = wordCards.filter(isMastered).length;
     ui.mastery.textContent = `${Math.round(masteryOf(wordCards) * 100)}%`;
     ui.masteredStat.dataset.tip =
-      'Words in this deck and stage you have reached the top box on — four correct answers in a row, with no miss in between.';
+      'Words in this deck and stage you have fully learned — four correct answers in a row, with no miss in between.';
     ui.masteryStat.dataset.tip =
       'How far this deck and stage has climbed overall, counting partial progress on every word — not only the mastered ones.';
   }
@@ -357,6 +365,19 @@ function renderStages() {
     : 'Every stage on this deck is open.';
 }
 
+/**
+ * Every stage this deck has opened.
+ *
+ * Switching decks used to drop the selection back to Basics alone, which quietly
+ * took away depth somebody had already earned — you unlock Fluent, change deck
+ * to look at something, come back, and you are practising Basics again. The
+ * default is everything open, and narrowing it is the learner's choice to make.
+ */
+function unlockedStages(deckId) {
+  const depth = unlockedDepth(deckId, data.cards);
+  return Array.from({ length: depth + 1 }, (_, index) => index);
+}
+
 /** Stages are a multi-select, but a round needs at least one. */
 function toggleStage(stage) {
   const next = stages.includes(stage) ? stages.filter((s) => s !== stage) : [...stages, stage];
@@ -369,10 +390,10 @@ function renderModes() {
   // The meta line names the ceiling each mode can reach, because that is the
   // one thing about these four that is not obvious from their names — and it is
   // the whole reason there are four.
-  const CAPS = { teach: 'to box 1', guided: 'to box 3', free: 'to mastery' };
+  const PURPOSE = { teach: 'for learning', guided: 'for practice', free: 'for mastery' };
   const options = [
-    { id: null, name: 'Auto', meta: 'earned', note: 'Follow each card' },
-    ...MODES.map((mode) => ({ id: mode, name: MODE_LABELS[mode], meta: CAPS[mode], note: MODE_DESCRIPTIONS[mode] }))
+    { id: null, name: 'Auto', meta: 'recommended', note: 'Follow each card' },
+    ...MODES.map((mode) => ({ id: mode, name: MODE_LABELS[mode], meta: PURPOSE[mode], note: MODE_DESCRIPTIONS[mode] }))
   ];
 
   ui.modeRow.replaceChildren(
@@ -398,10 +419,10 @@ function renderModes() {
 
   ui.modeNote.textContent =
     preferredMode === 'free'
-      ? 'A blank pad is the only mode that can take a character to the top box.'
+      ? 'Writing from memory is the only thing that counts as mastering a character.'
       : preferredMode === null
-        ? 'Each character opens in the mode it has earned, and climbs as it is learned.'
-        : 'Tracing keeps a character fresh, but only a blank pad masters it.';
+        ? 'Each character starts where it has earned, and moves up as you learn it.'
+        : 'Useful practice, but only writing from memory can master a character.';
 }
 
 // ------------------------------------------------------------- word rounds
@@ -466,6 +487,33 @@ function renderQuestion() {
   ui.hint.innerHTML = 'Answer with <kbd>1</kbd>–<kbd>4</kbd> · <kbd>Enter</kbd> to continue';
   ui.hint.classList.remove('waiting');
   fitPrompt();
+  bringBoardIntoView(ui.play);
+}
+
+/**
+ * Bring the whole question into view when it does not fit.
+ *
+ * The wordmark and the two selects are touched once a session; the answers are
+ * touched twenty times a round. So the chrome above scrolls away and the
+ * scoreboard parks at the top — near enough to glance at, far enough to give
+ * the card the room it needs.
+ *
+ * Only when it is actually needed. Scrolling somebody who can already see the
+ * whole card, or who has deliberately scrolled up to look at their streak, is
+ * just taking the page away from them.
+ *
+ * Instant, not smooth. A glide reads better in principle, but it is animated by
+ * the compositor and there are contexts where it silently does nothing at all,
+ * which is a worse outcome than a jump.
+ */
+function bringBoardIntoView(card) {
+  if (!card || card.hidden) return;
+  if (card.getBoundingClientRect().bottom <= window.innerHeight - 8) return;
+
+  const target = ui.scoreboard.getBoundingClientRect().top + window.scrollY - 8;
+  if (target <= window.scrollY + 4) return; // already at or past it
+
+  window.scrollTo({ top: Math.max(0, target), behavior: 'auto' });
 }
 
 /**
@@ -521,6 +569,7 @@ function submit(choice) {
 
   renderScoreboard();
   ui.roundProgress.style.width = `${(game.state.asked / game.state.roundLength) * 100}%`;
+  bringBoardIntoView(ui.play);
 
   if (result.correct) {
     setTimeout(advance, 700);
@@ -631,6 +680,7 @@ async function renderWord() {
   );
 
   if (charRound.generation !== generation) return;
+  bringBoardIntoView(ui.write);
   activateChar();
 }
 
@@ -1199,7 +1249,7 @@ ui.characterSource.addEventListener('change', () => {
 });
 
 ui.deck.addEventListener('change', () => {
-  stages = [0];
+  stages = unlockedStages(ui.deck.value);
   startRound();
 });
 
@@ -1224,17 +1274,6 @@ ui.scriptToggle.addEventListener('click', () => {
     fitPrompt();
   }
 });
-
-/**
- * "Mixed (recommended)" does not fit a phone's select, and a native option
- * cannot be trimmed with CSS — it truncates to "Mixed (reco…", which reads as a
- * mistake. The word is dropped where there is no room for it.
- */
-function fitDirectionOption() {
-  const option = ui.direction.querySelector('option[data-full]');
-  if (!option) return;
-  option.textContent = window.innerWidth < 460 ? option.dataset.short : option.dataset.full;
-}
 
 // ---------------------------------------------------------------- keyboard
 
@@ -1282,7 +1321,6 @@ for (const tile of document.querySelectorAll('[data-tip]')) {
 }
 
 window.addEventListener('resize', () => {
-  fitDirectionOption();
   if (!ui.play.hidden) fitPrompt();
 });
 
@@ -1296,7 +1334,7 @@ preferredMode = data.prefs.mode === store.AUTO_MODE ? null : data.prefs.mode;
 
 populateDecks();
 ui.direction.value = MIXED;
-fitDirectionOption();
+stages = unlockedStages(ui.deck.value || ALL_DECK_ID);
 startRound();
 
 readAuthResult();

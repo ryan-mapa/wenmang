@@ -20,6 +20,14 @@
   --qing: #2f9fb5;
   --jade: #4fbf8b;
   --zhu: #d4553f;
+
+  /* A brighter pair of the same two hues, for the two places the app is
+     celebrating rather than labelling: the wordmark and a live streak. The
+     structural teal and jade above stay muted — they edge panels and fill
+     meters, and at that size a bright colour is noise. */
+  --qing-lit: #34d3ea;
+  --jade-lit: #5cf0a6;
+  --lit: linear-gradient(95deg, var(--qing-lit), var(--jade-lit));
   --radius: 14px;
   --card-pad: 22px;
 
@@ -72,13 +80,14 @@ body {
   margin: 0;
   font-family: var(--han);
   font-size: 26px;
+  font-weight: 700;
   letter-spacing: 0.02em;
-  background: linear-gradient(90deg, var(--qing), var(--jade));
+  background: var(--lit);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
-.wordmark-latin { font-size: 15px; color: var(--muted); letter-spacing: 0.02em; }
+.wordmark-latin { font-size: 15px; font-weight: 600; color: var(--ink-soft); letter-spacing: 0.02em; }
 
 .settings { display: flex; align-items: flex-end; gap: 8px; }
 
@@ -87,13 +96,16 @@ body {
    would narrow while the control inside it did not, and the overflow would land
    on top of the streak guard. */
 .field { min-width: 0; display: grid; gap: 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
-.settings .field { flex: 1 1 auto; }
 .settings select { width: 100%; }
-.field-deck { min-width: 7rem; }
-/* Wide enough for "Mixed (recommended)" so the default option is not truncated
-   into "Mixed (reco…", which reads as a mistake rather than as a long word.
-   Below 460px the option text itself is swapped for the short form instead. */
-.field-direction { min-width: 11rem; }
+
+/* The two selects share the row and shrink together. A flex-basis rather than
+   a min-width: a select left to its intrinsic size is as wide as its longest
+   option, so the field would narrow while the control inside it did not, and
+   the overflow would land on top of the streak guard. The deck gets the larger
+   share because deck names are the longest strings here. */
+.settings .field { flex: 1 1 0; min-width: 0; }
+.field-deck { flex-basis: 9rem; }
+.field-direction { flex-basis: 8rem; }
 
 select {
   background: var(--panel);
@@ -129,6 +141,9 @@ select {
 .chip-toggle:hover { color: var(--ink); border-color: var(--muted); }
 
 .shield svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+/* Two bars inside the shield. A shield alone says "protected"; the bars are
+   what make this the control the warning line calls "pause it". */
+.shield .pause { stroke-width: 2; stroke-linecap: round; }
 .shield.on { color: var(--qing); border-color: var(--qing); }
 .shield.on svg { fill: var(--qing); fill-opacity: 0.18; }
 
@@ -180,7 +195,7 @@ button.stat { cursor: pointer; }
    celebrating nothing. Diagonal rather than horizontal, because a single digit
    has no room for a sweep across its width and would read as flat teal. */
 .stat-value.lit {
-  background: linear-gradient(145deg, var(--qing) 10%, var(--jade) 90%);
+  background: linear-gradient(145deg, var(--qing-lit) 10%, var(--jade-lit) 90%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -663,7 +678,8 @@ kbd { background: var(--panel-hi); border: 1px solid var(--line); border-radius:
    stays three across — stacking it costs 240px to save nothing. */
 @media (max-width: 460px) {
   body { padding: 14px 12px 24px; }
-  .field-direction { min-width: 6.5rem; }
+  .field-deck { flex-basis: 7rem; }
+  .field-direction { flex-basis: 6.5rem; }
   .topbar { flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
   .auth { order: 1; }
   .settings { order: 2; flex-basis: 100%; }
