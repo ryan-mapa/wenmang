@@ -616,7 +616,12 @@ function submit(choice) {
   ui.roundProgress.style.width = `${(game.state.asked / game.state.roundLength) * 100}%`;
   bringBoardIntoView(ui.play);
 
-  if (result.correct) {
+  // A right answer moves on by itself — except when the example is open. Asking
+  // for the sentence is asking to read it, and answering correctly a moment
+  // later should not snatch it away mid-line. Answering is also the moment the
+  // *other* lines appear, so the reading somebody wanted has only just become
+  // possible.
+  if (result.correct && !exampleShown) {
     setTimeout(advance, 700);
   } else {
     // The keys are wrapped so a touch device can drop them: this line is the
