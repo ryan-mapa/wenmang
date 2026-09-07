@@ -616,21 +616,19 @@ function submit(choice) {
   ui.roundProgress.style.width = `${(game.state.asked / game.state.roundLength) * 100}%`;
   bringBoardIntoView(ui.play);
 
-  // A right answer moves on by itself — except when the example is open. Asking
-  // for the sentence is asking to read it, and answering correctly a moment
-  // later should not snatch it away mid-line. Answering is also the moment the
-  // *other* lines appear, so the reading somebody wanted has only just become
-  // possible.
-  if (result.correct && !exampleShown) {
-    setTimeout(advance, 700);
-  } else {
-    // The keys are wrapped so a touch device can drop them: this line is the
-    // one piece of guidance that stays on screen on a phone, and naming keys it
-    // does not have is worse than saying nothing.
-    ui.hint.innerHTML =
-      'Tap anywhere<span class="keys"> · <kbd>Enter</kbd> or <kbd>1</kbd>–<kbd>4</kbd></span> to continue';
-    ui.hint.classList.add('waiting');
-  }
+  // Every answer waits for the player, right ones included. A correct answer
+  // used to move on by itself after a beat, which reads as brisk until you want
+  // to look at what you just got — the pinyin you half-guessed, the example
+  // sentence, which of the other three choices you nearly picked. The pause was
+  // never long enough to read any of it, and the moment is gone before you can
+  // decide you wanted it.
+  //
+  // The keys are wrapped so a touch device can drop them: this line is the one
+  // piece of guidance that stays on screen on a phone, and naming keys it does
+  // not have is worse than saying nothing.
+  ui.hint.innerHTML =
+    'Tap anywhere<span class="keys"> · <kbd>Enter</kbd> or <kbd>1</kbd>–<kbd>4</kbd></span> to continue';
+  ui.hint.classList.add('waiting');
 }
 
 function advance() {
