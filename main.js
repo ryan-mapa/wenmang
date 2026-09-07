@@ -24,6 +24,9 @@ import {
 import { hintAt, HINT_LEVELS } from './source/hints.js';
 import { loadCharacter, writerOptions, demonstratesFirst, ATTRIBUTION } from './source/strokes.js';
 import { fetchMe, sync as pushPull, deleteAccount, signOut as endSession } from './source/api.js';
+import {
+  MANIFEST_URL, VOICE_COUNT, clipUrl, nextVoice, canPlay, hasClip
+} from './source/audio.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -83,6 +86,8 @@ const ui = {
   directionHint: el('direction-hint'),
   prompt: el('prompt'),
   promptSub: el('prompt-sub'),
+  speakPrompt: el('speak-prompt'),
+  speakPromptDots: el('speak-prompt-dots'),
   choices: el('choices'),
   feedback: el('feedback'),
   hint: el('hint'),
@@ -91,6 +96,8 @@ const ui = {
   writeHint: el('write-hint'),
   charGloss: el('char-gloss'),
   charContext: el('char-context'),
+  speakWrite: el('speak-write'),
+  speakWriteDots: el('speak-write-dots'),
   padRow: el('pad-row'),
   charFeedback: el('char-feedback'),
   charHintBtn: el('char-hint-btn'),
@@ -148,6 +155,22 @@ let writer = null;
 
 /** Whether an account is signed in. False also covers "there is no API here". */
 let signedIn = false;
+
+/**
+ * Which words have a complete set of recordings, by slug.
+ *
+ * Empty until the manifest loads, and empty forever on a copy served before the
+ * clips were generated — which is the normal state of a static host and of any
+ * deck that has not been voiced yet. Empty means no speaker buttons, which is
+ * the right outcome: a button that cannot work is worse than no button.
+ */
+let spoken = new Set();
+
+/** Which of the four voices was heard last, so the next tap gives another. */
+let lastVoice = null;
+
+/** The clip currently playing, so a second tap can interrupt the first. */
+let playing = null;
 
 let roundCredited = false;
 let depthAtRoundStart = 0;
@@ -486,6 +509,8 @@ function renderQuestion() {
   ui.feedback.className = 'feedback';
   ui.hint.innerHTML = 'Answer with <kbd>1</kbd>–<kbd>4</kbd> · <kbd>Enter</kbd> to continue';
   ui.hint.classList.remove('waiting');
+  lastVoice = null;
+  renderPromptSpeaker();
   fitPrompt();
   bringBoardIntoView(ui.play);
 }
@@ -663,6 +688,9 @@ async function renderWord() {
   // The prompt is the meaning and the sound; the characters are the answer.
   ui.charGloss.textContent = item.word.en;
   ui.charContext.textContent = item.word.py;
+
+  lastVoice = null;
+  renderWriteSpeaker();
 
   ui.padRow.style.setProperty('--pad-count', item.chars.length);
   ui.padRow.replaceChildren(
@@ -1017,6 +1045,118 @@ ui.scoreboardNote.addEventListener('click', (event) => {
 });
 
 
+
+// ----------------------------------------------------------------- speech
+
+/**
+ * Which words can be heard.
+ *
+ * A missing or malformed manifest is not an error. The app is served from a
+ * plain static host as well as from the Worker, and clips are generated a deck
+ * at a time — so "no audio" is an ordinary state, and it should show no buttons
+ * rather than broken ones.
+ */
+async function loadAudioManifest() {
+  try {
+    const res = await fetch(MANIFEST_URL);
+    if (!res.ok) return;
+    const manifest = await res.json();
+    if (Array.isArray(manifest?.spoken)) spoken = new Set(manifest.spoken);
+  } catch {
+    // Offline, or no manifest. Silence is the correct outcome.
+  }
+}
+
+/** Fill the dot row and light the voice just heard. */
+function renderDots(dots) {
+  if (dots.children.length !== VOICE_COUNT) {
+    dots.replaceChildren(
+      ...Array.from({ length: VOICE_COUNT }, () =>
+        Object.assign(document.createElement('span'), { className: 'dot' })
+      )
+    );
+  }
+  [...dots.children].forEach((dot, i) => dot.classList.toggle('on', i === lastVoice));
+}
+
+/**
+ * Play the next voice for a word.
+ *
+ * Cycling rather than repeating is the whole reason there are four: one tap is
+ * a reminder, four is listening practice, and hearing the same tones in four
+ * mouths is worth more in Chinese than in a language where the vowel does not
+ * carry meaning.
+ */
+function speak(button, dots, zh) {
+  if (!hasClip(spoken, zh)) return;
+
+  if (playing) {
+    playing.audio.pause();
+    playing.button.classList.remove('playing');
+  }
+
+  lastVoice = nextVoice(lastVoice, VOICE_COUNT);
+  renderDots(dots);
+
+  const audio = new Audio(clipUrl(zh, lastVoice));
+  playing = { audio, button };
+  button.classList.add('playing');
+
+  const done = () => {
+    button.classList.remove('playing');
+    if (playing?.audio === audio) playing = null;
+  };
+  audio.addEventListener('ended', done);
+  // A clip that fails to load should look like nothing happened, not like a
+  // broken button.
+  audio.addEventListener('error', done);
+  audio.play().catch(done);
+}
+
+/**
+ * The speaker beside a word question.
+ *
+ * Only where speaking the word would not simply answer the question. In the
+ * recall direction the Chinese *is* the answer, and in Chinese hearing it gives
+ * away more than it would in Spanish — the sound is most of what is being
+ * asked for.
+ */
+function renderPromptSpeaker() {
+  const question = game?.state.question;
+  const show =
+    Boolean(question) && hasClip(spoken, question.word.zh) && canPlay(question.direction);
+
+  ui.speakPrompt.hidden = !show;
+  ui.speakPromptDots.hidden = !show;
+  if (show) renderDots(ui.speakPromptDots);
+}
+
+/**
+ * The speaker on the writing card.
+ *
+ * Always available when the clip exists, in every mode. Hearing 苹果 does not
+ * tell you how to write 苹 — the sound and the shape are different answers, so
+ * unlike the recall direction there is nothing here to give away.
+ */
+function renderWriteSpeaker() {
+  const word = charRound?.items[charRound.index]?.word;
+  const show = Boolean(word) && hasClip(spoken, word.zh);
+
+  ui.speakWrite.hidden = !show;
+  ui.speakWriteDots.hidden = !show;
+  if (show) renderDots(ui.speakWriteDots);
+}
+
+ui.speakPrompt.addEventListener('click', () => {
+  const word = game?.state.question?.word;
+  if (word) speak(ui.speakPrompt, ui.speakPromptDots, word.zh);
+});
+
+ui.speakWrite.addEventListener('click', () => {
+  const word = charRound?.items[charRound.index]?.word;
+  if (word) speak(ui.speakWrite, ui.speakWriteDots, word.zh);
+});
+
 // ------------------------------------------------------------- account
 
 /**
@@ -1336,6 +1476,13 @@ populateDecks();
 ui.direction.value = MIXED;
 stages = unlockedStages(ui.deck.value || ALL_DECK_ID);
 startRound();
+
+// The manifest decides whether any speaker button appears, so load it and
+// re-render once it lands rather than gating the first round on a fetch.
+loadAudioManifest().then(() => {
+  renderPromptSpeaker();
+  renderWriteSpeaker();
+});
 
 readAuthResult();
 // Sign-in state first, then a sync: the sync is a no-op until we know there is
