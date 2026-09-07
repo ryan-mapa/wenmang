@@ -1,0 +1,306 @@
+/* Wenmang. One column, big type, dark by default — most practice happens in
+   the evening and a white field behind a character you are staring at is
+   tiring. Characters are the interface, so they get the space. */
+
+:root {
+  color-scheme: dark light;
+
+  --ink: #f2ede4;
+  --muted: #97918a;
+  --ground: #14110f;
+  --raised: #201c19;
+  --line: #322c27;
+  --seal: #c8452f;      /* the red of a name chop; used for the streak and errors */
+  --jade: #4f9d76;      /* correct */
+  --brush: #e8e0d2;     /* the ink a character is drawn in */
+
+  --pad: clamp(260px, 78vw, 340px);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --ink: #1c1815;
+    --muted: #6d665f;
+    --ground: #faf6ef;
+    --raised: #fffdf9;
+    --line: #e3dbd0;
+    --brush: #2a2622;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--ground);
+  color: var(--ink);
+  font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Chinese text wants a font stack of its own — a Latin-first stack renders
+   simplified characters in whatever fallback the OS picks, which is often a
+   Japanese face with visibly wrong glyph forms. */
+.hanzi, .prompt-main.is-hanzi, .choice.is-hanzi, .char-context b {
+  font-family: "PingFang SC", "Hiragino Sans GB", "Source Han Sans SC",
+               "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+}
+
+/* ---------- bar ---------- */
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.wordmark {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.wordmark .latin { color: var(--muted); font-weight: 500; font-size: 15px; }
+
+.bar-tools { display: flex; align-items: center; gap: 10px; }
+
+.streak { color: var(--seal); font-variant-numeric: tabular-nums; font-size: 14px; }
+.streak:empty { display: none; }
+
+.icon-toggle {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 10px;
+}
+.icon-toggle:hover { color: var(--ink); border-color: var(--muted); }
+
+.share-note { color: var(--muted); font-size: 13px; }
+
+/* ---------- screens ---------- */
+
+.screen {
+  flex: 1;
+  width: min(560px, 100%);
+  margin: 0 auto;
+  padding: 22px 18px 40px;
+}
+
+h2 {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 12px;
+}
+
+/* ---------- daily goal ---------- */
+
+.goal { margin-bottom: 28px; }
+
+.goal-meter {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--raised);
+  overflow: hidden;
+}
+.goal-fill {
+  height: 100%;
+  width: 0;
+  background: var(--jade);
+  transition: width 260ms ease;
+}
+.goal-text { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+
+/* ---------- pickers ---------- */
+
+.picker { margin-bottom: 28px; }
+
+.round-types, .modes { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.round-types button, .modes button {
+  flex: 1 1 auto;
+  min-width: 120px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--raised);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.round-types button[aria-pressed="true"], .modes button[aria-pressed="true"] {
+  border-color: var(--jade);
+  box-shadow: inset 0 0 0 1px var(--jade);
+}
+.round-types button:disabled, .modes button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.round-types small, .modes small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+.decks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+
+.deck {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--raised);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.deck:hover { border-color: var(--muted); }
+.deck .emoji { font-size: 20px; }
+.deck .meta { color: var(--muted); font-size: 12px; }
+
+.locked-note, .hint-note, .mode-badge {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 10px 0 0;
+  min-height: 1.4em;
+}
+
+button.primary {
+  margin-top: 14px;
+  padding: 13px 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--jade);
+  color: #08110c;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ---------- rounds ---------- */
+
+.progress { height: 3px; background: var(--raised); border-radius: 2px; margin-bottom: 26px; }
+.progress-fill { height: 100%; width: 0; background: var(--muted); border-radius: 2px; transition: width 200ms ease; }
+
+.prompt { text-align: center; margin: 26px 0 32px; }
+.prompt-main { margin: 0; font-size: 30px; font-weight: 600; line-height: 1.25; }
+.prompt-main.is-hanzi { font-size: clamp(48px, 15vw, 76px); font-weight: 500; }
+.prompt-sub { margin: 8px 0 0; color: var(--muted); font-size: 17px; min-height: 1.4em; }
+
+.choices { display: grid; gap: 9px; }
+
+.choice {
+  padding: 15px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: 17px;
+  cursor: pointer;
+  text-align: center;
+}
+.choice.is-hanzi { font-size: 26px; }
+.choice:hover:not(:disabled) { border-color: var(--muted); }
+.choice.right { border-color: var(--jade); color: var(--jade); }
+.choice.wrong { border-color: var(--seal); color: var(--seal); }
+.choice:disabled { cursor: default; }
+
+.feedback { text-align: center; color: var(--muted); min-height: 1.6em; margin: 16px 0 0; }
+
+/* ---------- writing pad ---------- */
+
+.char-head { text-align: center; margin-bottom: 18px; }
+.char-gloss { margin: 0; font-size: 22px; font-weight: 600; }
+.char-context { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+.char-context b { color: var(--ink); font-weight: 500; }
+
+.pad-wrap {
+  position: relative;
+  width: var(--pad);
+  height: var(--pad);
+  margin: 0 auto;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+/* The 米字格 — the crossed practice grid every Chinese exercise book uses.
+   It is not decoration: proportion and placement are most of what makes
+   handwriting legible, and without guides a learner has nothing to place
+   strokes against. */
+.pad-grid {
+  position: absolute;
+  inset: 10px;
+  background-image:
+    linear-gradient(to right, var(--line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--line) 1px, transparent 1px),
+    linear-gradient(to bottom right, transparent calc(50% - 0.5px), var(--line) calc(50% - 0.5px), var(--line) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+    linear-gradient(to bottom left, transparent calc(50% - 0.5px), var(--line) calc(50% - 0.5px), var(--line) calc(50% + 0.5px), transparent calc(50% + 0.5px));
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0.55;
+}
+.pad-grid::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to right, transparent calc(50% - 0.5px), var(--line) calc(50% - 0.5px), var(--line) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+    linear-gradient(to bottom, transparent calc(50% - 0.5px), var(--line) calc(50% - 0.5px), var(--line) calc(50% + 0.5px), transparent calc(50% + 0.5px));
+}
+
+.pad { position: absolute; inset: 0; touch-action: none; }
+.pad svg { display: block; width: 100%; height: 100%; }
+
+.char-tools { display: flex; gap: 8px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+.char-tools button {
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.char-tools button:hover { color: var(--ink); border-color: var(--muted); }
+
+.mode-badge { text-align: center; }
+
+/* ---------- results ---------- */
+
+.done-title { font-size: 24px; margin: 40px 0 10px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+.done-line { margin: 0 0 8px; }
+.done-line.muted { color: var(--muted); font-size: 14px; }
+
+#screen-done button { margin-right: 8px; padding: 11px 16px; border-radius: 9px; border: 1px solid var(--line); background: none; color: var(--ink); font: inherit; cursor: pointer; }
+#screen-done button.primary { border: none; background: var(--jade); color: #08110c; }
+
+/* ---------- foot ---------- */
+
+.foot {
+  padding: 18px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+  line-height: 1.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

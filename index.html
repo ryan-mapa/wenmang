@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>文盲 Wenmang — Mandarin words and characters</title>
+  <meta name="description" content="Learn Mandarin vocabulary and how to write the characters by hand, with spaced repetition.">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.7.3/dist/hanzi-writer.min.js" defer></script>
+</head>
+<body>
+  <header class="bar">
+    <h1 class="wordmark"><span class="hanzi">文盲</span> <span class="latin">Wenmang</span></h1>
+    <div class="bar-tools">
+      <span class="streak" id="streak" title="Day streak"></span>
+      <button class="icon-toggle" id="script-toggle" type="button" title="Change what is shown"></button>
+      <span class="share-note" id="share-note" role="status" aria-live="polite"></span>
+      <button class="icon-toggle" id="share" type="button" aria-label="Share this app" title="Share this app">↗</button>
+    </div>
+  </header>
+
+  <!-- Home -->
+  <main class="screen" id="screen-home">
+    <section class="goal">
+      <div class="goal-meter"><div class="goal-fill" id="goal-fill"></div></div>
+      <p class="goal-text" id="goal-text"></p>
+    </section>
+
+    <section class="picker">
+      <h2>Practise</h2>
+      <div class="round-types" id="round-types" role="group" aria-label="Round type"></div>
+      <p class="locked-note" id="locked-note"></p>
+    </section>
+
+    <section class="picker" id="deck-section">
+      <h2>Decks</h2>
+      <div class="decks" id="decks"></div>
+    </section>
+
+    <section class="picker" id="writing-section" hidden>
+      <h2>Writing</h2>
+      <div class="modes" id="mode-picker" role="group" aria-label="Writing mode"></div>
+      <p class="hint-note" id="mode-note"></p>
+      <button class="primary" id="start-characters" type="button">Start a character round</button>
+    </section>
+  </main>
+
+  <!-- Word round -->
+  <main class="screen" id="screen-words" hidden>
+    <div class="progress"><div class="progress-fill" id="word-progress"></div></div>
+    <section class="prompt">
+      <p class="prompt-main" id="prompt-main"></p>
+      <p class="prompt-sub" id="prompt-sub"></p>
+    </section>
+    <div class="choices" id="choices"></div>
+    <p class="feedback" id="word-feedback" role="status" aria-live="polite"></p>
+  </main>
+
+  <!-- Character round -->
+  <main class="screen" id="screen-chars" hidden>
+    <div class="progress"><div class="progress-fill" id="char-progress"></div></div>
+    <section class="char-head">
+      <p class="char-gloss" id="char-gloss"></p>
+      <p class="char-context" id="char-context"></p>
+    </section>
+    <div class="pad-wrap">
+      <div class="pad-grid" aria-hidden="true"></div>
+      <div class="pad" id="pad"></div>
+    </div>
+    <p class="hint-note" id="char-hint" role="status" aria-live="polite"></p>
+    <div class="char-tools">
+      <button id="hint" type="button">Hint</button>
+      <button id="show-again" type="button">Show it again</button>
+      <button id="skip" type="button">Skip</button>
+    </div>
+    <p class="mode-badge" id="char-mode"></p>
+  </main>
+
+  <!-- Results -->
+  <main class="screen" id="screen-done" hidden>
+    <h2 class="done-title" id="done-title"></h2>
+    <p class="done-line" id="done-line"></p>
+    <p class="done-line muted" id="done-unlocked"></p>
+    <button class="primary" id="again" type="button">Again</button>
+    <button id="home" type="button">Back</button>
+  </main>
+
+  <footer class="foot">
+    <span id="attribution"></span>
+  </footer>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

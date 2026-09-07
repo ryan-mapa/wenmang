@@ -1,0 +1,54 @@
+Wenmang — third-party data notices
+==================================
+
+The application code in this repository is original work. Two third-party
+data sets are used, and neither is redistributed from this repository: both
+are fetched at runtime or consulted at build time. They are named here because
+attribution is owed regardless of how the data reaches a user.
+
+
+1. Character stroke data — Make Me a Hanzi
+------------------------------------------
+Stroke outlines, medians and stroke order are served to the browser at runtime
+from the `hanzi-writer-data` package (https://github.com/chanind/hanzi-writer).
+That data comes from Make Me a Hanzi (https://github.com/skishore/makemeahanzi),
+which derives it from the Arphic PL fonts:
+
+    "AR PL Mingti2L Big5" and "AR PL KaitiM Big5" (BIG-5)
+    "AR PL SungtiL GB" and "AR PL KaitiM GB" (GB)
+
+    Copyright (C) 1999 Arphic Technology Co., Ltd.
+
+Used under the Arphic Public License. The full licence text ships with the
+data package as ARPHICPL.TXT and is reproduced at:
+https://github.com/skishore/makemeahanzi/blob/master/ARPHICPL.TXT
+
+Note for maintainers: the Arphic Public License attaches obligations to
+*distributing* the font data, and additional obligations to distributing a
+*modified* copy — and it counts "adding/deleting some characters in/from glyph
+table" as modification. This project therefore does not vendor a trimmed subset
+of the data. If that ever changes, section 2 of the licence requires the
+modification to be documented and made freely available under the same terms.
+See source/strokes.js, which is the only module that touches this data.
+
+
+2. Radical and stroke-count data — Unicode Han Database (Unihan)
+-----------------------------------------------------------------
+The `radical`, `residual` and `strokes` fields in source/character-data.js are
+generated from the kRSUnicode and kTotalStrokes fields of the Unihan database.
+
+    Copyright (C) 1991-present Unicode, Inc.
+
+Used under the Unicode License. Unihan is not vendored here; it is downloaded
+on demand by tools/build-characters.mjs, which regenerates the table.
+
+
+3. hanzi-writer
+---------------
+Rendering and quiz behaviour come from hanzi-writer, MIT licensed.
+
+    Copyright (c) 2016 Jason Chandler
+
+The 214 Kangxi radical forms, readings and glosses in source/radicals.js, the
+vocabulary in source/vocab.js, and all application code are original to this
+project.
