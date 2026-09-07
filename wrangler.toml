@@ -31,8 +31,7 @@ custom_domain = true
 [[d1_databases]]
 binding = "DB"
 database_name = "wenmang"
-# Set this to the id printed by `npx wrangler d1 create wenmang`.
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "f223bddb-5fc2-4ce4-8a4d-34b8ef2d87e4"
 migrations_dir = "worker/migrations"
 
 # Secrets, set with `npx wrangler secret put <NAME>` (never in this file):
