@@ -23,7 +23,7 @@ No build step — ES modules straight from the filesystem:
 npm install
 npm run serve      # the game alone, on :8000
 npm run dev        # the game plus the API and a local database, on :8787
-npm test           # 149 tests
+npm test           # 191 tests
 ```
 
 Use `serve` for anything that does not touch accounts; it is faster to start
@@ -91,6 +91,27 @@ without Wubi's data: told "this is a 女 character with six strokes", most peopl
 recover the rest themselves and have learned something reusable when they do.
 Being shown the next stroke teaches only that stroke. One hint is free; past
 that the attempt stops counting as a success.
+
+**Audio.** Four Mandarin voices per word, two women and two men. Tapping the
+speaker cycles rather than repeats — one tap is a reminder, four is listening
+practice, and hearing the same tones in four mouths is worth more in Chinese
+than in a language where the vowel does not carry meaning. No speaker appears
+where hearing the word would answer the question: in the recall direction the
+Chinese *is* the answer. A word with no clip has no button, because a button
+that fails is worse than one that is not there.
+
+Clips are generated a deck at a time; **Food Basics is voiced, the other 24
+decks are not.** Filenames are the word's characters as codepoints — 水 becomes
+`6c34.mp3` — because pinyin collides constantly (是, 事 and 试 are all `shi`)
+and a colliding name silently serves one word's recording for another.
+
+**Example sentences.** One per word, shown behind a toggle: a sentence sitting
+under every prompt gets read *instead of* the word, and recall is what is being
+practised. The sentence follows the same script setting as the prompt —
+characters, pinyin, or both — and pinyin counts as a Chinese line for safety
+purposes, since in the recall direction it gives away the sound of the answer.
+Before answering you get only the prompt's own side; afterwards, everything.
+**Food Basics has all 25; no other deck has any.**
 
 **Daily goal.** Five rounds, of either kind — a day spent entirely on
 handwriting is as complete as one spent entirely on meanings. Streaks forgive
@@ -230,14 +251,44 @@ writing pad, and the round summary. The palette is its own — ink and celadon,
 a warm near-black ground with a 青 (qīng) teal running into jade, and cinnabar
 kept for misses and for danger.
 
+## Generating audio and sentences
+
+Both run detached, so neither is something to sit and watch. Progress goes to a
+status file, one line per pass.
+
+```sh
+cp ../vocabulario/.tts.env .tts.env                       # Azure key, gitignored
+nohup bash tools/audio-daemon.sh shiwu 0 > /dev/null 2>&1 &
+cat /tmp/wenmang-audio.status
+
+nohup bash tools/sentences-daemon.sh shiwu 0 > /dev/null 2>&1 &
+cat /tmp/wenmang-sentences.status
+```
+
+Audio costs no model usage — it is Azure and a shell loop. Sentences call the
+Anthropic API with a key in `.gen.env`, which costs money but not session time.
+Both skip work already done, so they are safe to interrupt and safe to re-run.
+
+For sentences there is a cheaper path worth knowing about: Vocabulario never
+used an API at all. `brief.mjs` hands a deck to an agent, `check-batch.mjs`
+validates the reply offline, `merge-batch.mjs` merges it — session usage instead
+of money, with the validation loop already worked out. Porting that is probably
+the right move before doing the remaining 24 decks.
+
 ## Not done yet
 
-- **Audio.** Deliberately deferred. Word records already carry pinyin, so adding
-  voices is additive rather than a migration.
-- **A native-speaker review of the vocabulary.** Tones are verified against
-  Unihan, but register and naturalness are not machine-checkable and have not
-  been read by anyone who would notice.
-- **Example sentences.** Vocabulario has one per word; this has none yet.
+- **A native-speaker review of the vocabulary and the sentences.** Tones are
+  verified against Unihan, for words and for sentences alike, but register and
+  naturalness are not machine-checkable and have not been read by anyone who
+  would notice.
+- **Audio and sentences beyond Food Basics.** 25 words of 1,760 are voiced, and
+  25 have example sentences. Both are a matter of running the generators.
+- **Audio for a real deploy.** `audio/` is gitignored, so a deploy uploads
+  whatever is on the deploying machine. Fine for 100 files; Vocabulario moved to
+  R2 before it was thousands, and so should this.
+- **First load takes about two seconds.** Eighteen unbundled ES modules
+  waterfalling. No build step was the right call locally and costs real latency
+  over the network; Vocabulario has a `build.mjs` for exactly this.
 - **A third-party request on every character.** Stroke data is fetched from
   jsDelivr as you practise, which is disclosed in the privacy policy. Avoiding
   it means self-hosting the data and taking on the Arphic notice obligations —
