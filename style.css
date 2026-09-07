@@ -541,6 +541,14 @@ button.stat { cursor: pointer; }
   transition: border-color 0.2s ease, opacity 0.2s ease;
 }
 
+/* Expanded: the square being written fills the row on its own, at the size a
+   one-character word would get. A four-character word otherwise splits the row
+   four ways, which is a quarter of the drawing space for the same character —
+   fine for recognising it, tight for writing it. The squares either side are
+   taken out of the flow rather than shrunk, so the live one gets the whole
+   width; #char-context still says which character of how many this is. */
+.pad-row.is-expanded .pad-wrap:not(.is-active) { display: none; }
+
 /* Where you are in the word. The active square is the only one that takes
    strokes; the ones behind it keep what you wrote, and the ones ahead stay
    quiet so the eye goes to the right place. */

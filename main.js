@@ -105,6 +105,7 @@ const ui = {
   speakWrite: el('speak-write'),
   speakWriteDots: el('speak-write-dots'),
   padRow: el('pad-row'),
+  padExpand: el('pad-expand'),
   charFeedback: el('char-feedback'),
   charHintBtn: el('char-hint-btn'),
   showAgain: el('show-again'),
@@ -631,6 +632,36 @@ function submit(choice) {
   ui.hint.classList.add('waiting');
 }
 
+/**
+ * The one-big-square toggle.
+ *
+ * Only offered for words of more than one character — expanding a single square
+ * that already fills the row would do nothing, and a button that does nothing is
+ * worse than no button.
+ */
+function renderPadExpand() {
+  // currentWord() reads through charRound, which is null outside a character
+  // round — and this runs from the toggle, which can be pressed at any time.
+  const count = charRound ? currentWord()?.chars.length ?? 0 : 0;
+  const offered = count > 1;
+  const on = offered && data.prefs.padExpanded === true;
+  ui.padExpand.hidden = !offered;
+  ui.padExpand.textContent = on ? 'Show word' : 'Expand';
+  ui.padExpand.setAttribute('aria-pressed', String(on));
+  ui.padRow.classList.toggle('is-expanded', on);
+}
+
+ui.padExpand.addEventListener('click', () => {
+  data.prefs = { ...data.prefs, padExpanded: !data.prefs.padExpanded };
+  persist();
+  // Restyling alone is not enough: hanzi-writer measured the old square and
+  // will not re-measure, so the character has to be set up again at the new
+  // size. That restarts the character being written, which is the honest cost
+  // of changing the surface out from under it mid-stroke.
+  if (roundType === 'characters' && charRound) activateChar();
+  else renderPadExpand();
+});
+
 function advance() {
   if (!game?.state.lastAnswer) return;
   if (game.isRoundOver()) return showSummary();
@@ -753,6 +784,11 @@ async function activateChar() {
     wrap.classList.toggle('is-pending', position > charRound.charIndex);
     wrap.classList.toggle('is-done', position < charRound.charIndex);
   });
+
+  // Before the writer is built: it takes its size from the pad's width at
+  // creation, so the layout has to be settled first or a full-width square gets
+  // a quarter-width character drawn in the corner of it.
+  renderPadExpand();
 
   // Which character of the word, and how long it is — the row shows where you
   // are, this says what is being asked for.

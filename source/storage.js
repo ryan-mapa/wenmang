@@ -60,7 +60,7 @@ const EMPTY = {
   chars: {},
   days: {},
   guards: [],
-  prefs: { script: DEFAULT_SCRIPT, mode: AUTO_MODE, characterSource: 'all', sound: true, deck: null, direction: null },
+  prefs: { script: DEFAULT_SCRIPT, mode: AUTO_MODE, characterSource: 'all', sound: true, deck: null, direction: null, padExpanded: false },
   syncedAt: 0
 };
 
@@ -143,7 +143,12 @@ function readPrefs(raw) {
     // renamed or retired between sessions, and a stored id that no longer
     // exists must not leave the app pointing at nothing.
     deck: typeof raw?.deck === 'string' ? raw.deck : null,
-    direction: typeof raw?.direction === 'string' ? raw.direction : null
+    direction: typeof raw?.direction === 'string' ? raw.direction : null,
+    // One big square instead of one per character. Off by default: seeing the
+    // whole word assemble is the point of the row, and this trades that away
+    // for room to draw. Remembered, because somebody who needs the space on a
+    // three-character word needs it on the next one too.
+    padExpanded: raw?.padExpanded === true
   };
 }
 
