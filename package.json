@@ -14,8 +14,10 @@
     "db:local": "wrangler d1 migrations apply wenmang --local"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
     "vitest": "^2.1.9",
-    "wrangler": "^4.128.0"
+    "wrangler": "^4.128.0",
+    "zod": "^4.5.4"
   },
   "dependencies": {
     "hanzi-writer": "^3.7.3"

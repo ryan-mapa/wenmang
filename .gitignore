@@ -1,3 +1,13 @@
 node_modules/
 dist/
 .DS_Store
+.wrangler/
+
+# Credentials. Never committed, and named here before either file exists so
+# that adding one cannot be the moment somebody notices.
+.tts.env
+.gen.env
+
+# Generated audio. Thousands of small binaries do not belong in git history —
+# they are reproducible from tools/tts.mjs and served from the Worker's assets.
+audio/
