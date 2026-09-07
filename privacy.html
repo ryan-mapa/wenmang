@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Privacy — Wenmang</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app doc">
+    <p class="doc-back"><a class="linkish" href="/">← Wenmang</a></p>
+
+    <h1>Privacy</h1>
+    <p class="doc-lede">
+      Wenmang is a free Mandarin vocabulary and handwriting game. It exists to
+      help you learn words and characters, and it collects only what it needs to
+      do that. There is no advertising, no analytics, and no behavioural
+      profile.
+    </p>
+
+    <h2>Without an account</h2>
+    <p>
+      You can use the whole app without signing in. Signed out, everything stays
+      in your own browser's local storage and is never sent to this app's
+      server:
+    </p>
+    <ul>
+      <li><code>wenmang:v1</code> — which words you have seen and how well you
+        know each one, which characters you can write and in which mode, how
+        many rounds you finished on each day, and your display settings</li>
+      <li><code>wenmang:outbox</code> and <code>wenmang:rounds</code> — answers
+        and finished rounds waiting to sync, if you later sign in</li>
+    </ul>
+    <p>
+      Answers are recorded from your very first round whether or not you ever
+      sign in. That is what lets somebody who signs in later bring real history
+      with them rather than only a snapshot — but until you do sign in, none of
+      it leaves your browser.
+    </p>
+    <p>
+      Clearing your browser's site data removes all of it. Nothing is
+      recoverable afterwards, because no copy was ever made.
+    </p>
+
+    <h2>Character stroke data comes from a third party</h2>
+    <p>
+      The writing pad needs the stroke order and shape of each character. That
+      data is not served from here — your browser fetches it, and the drawing
+      library, from the public CDN <strong>jsDelivr</strong>
+      (<code>cdn.jsdelivr.net</code>) as you practise.
+    </p>
+    <p>
+      This means jsDelivr receives a request from your browser, which
+      necessarily reveals your IP address and which character you are about to
+      practise. jsDelivr is operated independently of this project and has its
+      own
+      <a class="linkish" href="https://www.jsdelivr.com/terms/privacy-policy-jsdelivr-net" target="_blank" rel="noopener noreferrer">privacy policy</a>.
+      No account information, and nothing about your progress, is sent with
+      those requests — a request for a character carries only the character.
+    </p>
+    <p>
+      This is the only third party your browser contacts while using the app,
+      apart from Google if you choose to sign in.
+    </p>
+
+    <h2>Signing in with Google</h2>
+    <p>
+      Signing in is optional. Its only purpose is to let your progress follow
+      you between devices.
+    </p>
+    <p>
+      Wenmang asks Google for two things: <code>openid</code> and
+      <code>profile</code>. <strong>It does not ask for, receive, or store your
+      email address.</strong> From your Google profile it keeps:
+    </p>
+    <ul>
+      <li>the account identifier Google issues for this app</li>
+      <li>your given name, used as the display name in the header</li>
+      <li>the date you first signed in</li>
+    </ul>
+
+    <h2>What is stored once you have an account</h2>
+    <ul>
+      <li><strong>Word answers</strong> — for each question: the Chinese word,
+        which deck and stage it came from, which direction it was asked in,
+        whether you got it right, and when</li>
+      <li><strong>Character attempts</strong> — the character, whether you
+        wrote it successfully, when, and which mode you were in: tracing, with
+        the outline shown, or from a blank pad. The mode is kept because a
+        character's progress depends on it, and replaying your history without
+        it would credit tracing as though you had written from memory</li>
+      <li><strong>Progress</strong> — the current state of each word and each
+        character, recalculated from those answers</li>
+      <li><strong>Rounds</strong> — how many questions a round asked, how many
+        were right, when it started and ended, and the calendar date it counted
+        toward, so the daily goal and streak work in your own time zone</li>
+      <li><strong>A sign-in session</strong> — a cookie named
+        <code>wenmang_session</code>, holding a signed token with your account
+        identifier and display name. It is <code>HttpOnly</code>, so page
+        scripts cannot read it, and it expires after 30 days</li>
+    </ul>
+    <p>
+      That cookie is the only one this site sets. There are no advertising,
+      tracking, or analytics cookies, because there is no advertising, tracking,
+      or analytics.
+    </p>
+
+    <h2>What is never collected</h2>
+    <ul>
+      <li>Your email address</li>
+      <li>Your IP address — this app stores no record of it</li>
+      <li>Any behavioural or advertising profile</li>
+      <li>Anything at all by this app's server, if you never sign in</li>
+    </ul>
+
+    <h2>Where it lives, and who can see it</h2>
+    <p>
+      The app and its database run on Cloudflare Workers and Cloudflare D1, in
+      North America. Data is never sold, never shared, and never used for
+      anything except showing you your own progress. It is accessible to the
+      person who maintains this project, and to nobody else.
+    </p>
+
+    <h2>Deleting your data</h2>
+    <p>
+      Open <strong>Account</strong> in the header and choose
+      <strong>Delete my account</strong>. Everything goes in that moment —
+      answers, word progress, character progress, rounds, your streak, and the
+      account record itself. There is no backup that survives it, and nothing to
+      wait for.
+    </p>
+    <p>
+      You can also revoke this app's access to your Google account at any time
+      from your
+      <a class="linkish" href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Google account permissions</a>,
+      which stops any future sign-in. If you would rather ask a person, email
+      <a class="linkish" href="mailto:hello@ryan-mapa.dev">hello@ryan-mapa.dev</a>.
+    </p>
+
+    <h2>Changes</h2>
+    <p>
+      If this policy changes, the change will be visible in the project's public
+      history at
+      <a class="linkish" href="https://github.com/ryan-mapa/wenmang" target="_blank" rel="noopener noreferrer">github.com/ryan-mapa/wenmang</a>,
+      along with the code that it describes.
+    </p>
+
+    <p class="doc-updated">Last updated 6 September 2026.</p>
+  </main>
+</body>
+</html>

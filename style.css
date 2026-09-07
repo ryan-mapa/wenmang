@@ -531,6 +531,50 @@ kbd { background: var(--panel-hi); border: 1px solid var(--line); border-radius:
 .transfer-status.good { color: var(--jade); }
 .transfer-status.bad { color: var(--zhu); }
 
+/* ------------------------------------------- privacy and terms documents */
+
+/* These inherit the app's tokens so the colours cannot drift apart, but not
+   its layout — a document reads left-aligned and needs a measure, where the
+   game is centred and narrow. */
+.doc {
+  max-width: 640px;
+  text-align: left;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--ink-soft);
+}
+.doc h1 { margin: 0 0 10px; font-size: 30px; letter-spacing: -0.02em; color: var(--ink); }
+.doc h2 {
+  margin: 34px 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+}
+.doc p { margin: 0 0 14px; }
+.doc ul { margin: 0 0 14px; padding-left: 20px; }
+.doc li { margin-bottom: 7px; }
+.doc strong { color: var(--ink); font-weight: 600; }
+.doc code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  color: var(--jade);
+  background: var(--panel);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+
+.doc-back { margin: 0 0 26px; font-size: 13px; }
+.doc-lede { font-size: 17px; line-height: 1.6; color: var(--ink); }
+.doc-updated {
+  margin-top: 34px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* ------------------------------------------------------------------ auth */
 
 /* Google's own button artwork and wording, unaltered — the whole value of the
