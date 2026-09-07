@@ -6,6 +6,13 @@
   <title>文盲 Wenmang — Mandarin words and characters</title>
   <meta name="description" content="Learn Mandarin vocabulary and how to write the characters by hand, with spaced repetition." />
   <link rel="icon" type="image/svg+xml" href="/assets/branding/wenmang-seal.svg" />
+  <!-- iOS ignores rel="icon" for "Add to Home Screen", and cannot read SVG there
+       either; without this it draws the page's first letter on a plain field.
+       180x180 PNG, opaque and full-bleed: transparency composites to black, and
+       iOS applies its own rounded mask, so any corners baked in show up twice. -->
+  <link rel="apple-touch-icon" href="/assets/branding/apple-touch-icon.png" />
+  <!-- The <title> is far too long for the label under the icon. -->
+  <meta name="apple-mobile-web-app-title" content="Wenmang" />
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.7.3/dist/hanzi-writer.min.js" defer></script>
 </head>
