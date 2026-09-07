@@ -1539,13 +1539,10 @@ document.addEventListener('keydown', (event) => {
   }
 
   if (event.key === 'Enter') {
-    // Enter on a focused control presses that control — the browser fires its
-    // click for us. Carrying on here as well would replay the audio and skip
-    // the question in one keystroke, the keyboard form of the same bug the
-    // card's click handler guards against. A *disabled* control is not
-    // exempted: a spent choice button cannot be pressed, so Enter still means
-    // carry on.
-    if (document.activeElement?.closest?.('button:enabled, a[href]')) return;
+    // Enter carries on wherever the focus happens to be, including on a control
+    // in the card. Unlike a click on the speaker, which asks for that one thing,
+    // Enter is an explicit "next" — so it is not treated as the keyboard form of
+    // the stray-advance bug the card's click handler guards against.
     if (!ui.summary.hidden) startRound();
     else if (!ui.play.hidden) advance();
   }
