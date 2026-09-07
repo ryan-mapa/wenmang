@@ -1080,13 +1080,19 @@ ui.scoreboardNote.addEventListener('click', (event) => {
 function renderExample() {
   const question = game?.state.question;
   const answered = Boolean(game?.state.lastAnswer);
-  const lines = exampleLines(exampleFor(SENTENCES, question?.word.zh), question?.direction, answered);
+  const lines = exampleLines(
+    exampleFor(SENTENCES, question?.word.zh),
+    question?.direction,
+    answered,
+    data.prefs.script
+  );
 
   // Cleared first, always. Returning early with the previous question's lines
   // still in the DOM is how a stale sentence ends up under a new word.
   ui.exampleLines.replaceChildren();
 
-  const offered = Boolean(question) && hasExample(SENTENCES, question.word, question.direction);
+  const offered =
+    Boolean(question) && hasExample(SENTENCES, question.word, question.direction, data.prefs.script);
   ui.example.hidden = !offered;
   if (!offered) return;
 

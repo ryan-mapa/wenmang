@@ -99,8 +99,10 @@ const hanCount = (text) => [...text].filter(isHan).length;
  * the word it illustrates is worse than no sentence: it is shown *as* the
  * example, and a learner has no way to know it is wrong.
  */
-function reject(word, sentence, english) {
-  if (typeof sentence !== 'string' || typeof english !== 'string') return 'missing a field';
+function reject(word, sentence, pinyin, english) {
+  if ([sentence, pinyin, english].some((part) => typeof part !== 'string')) return 'missing a field';
+  if (/\d/.test(pinyin)) return 'pinyin has a tone number';
+  if (!/[\u0100-\u01ff\u00e0-\u00fc]/.test(pinyin)) return 'pinyin has no tone marks';
   if (!sentence.includes(word.zh)) return `does not contain ${word.zh}`;
   if (hanCount(sentence) < MIN_CHARS) return 'too short';
   if (hanCount(sentence) > MAX_CHARS) return 'too long';
@@ -116,6 +118,7 @@ const Schema = z.object({
     z.object({
       word: z.string(),
       chinese: z.string(),
+      pinyin: z.string(),
       english: z.string()
     })
   )
@@ -137,7 +140,11 @@ House style, which the app's validator enforces:
 - Avoid 他/她 where a neutral subject will do. A sentence should not need a
   person invented for it.
 - The English is a translation of the Chinese sentence, not an independent
-  example. The two are shown together and have to line up.`;
+  example. The two are shown together and have to line up.
+- The pinyin is the whole sentence read aloud, with tone marks, spaced by word
+  rather than by syllable. Write sandhi as it is said: 一杯 is "yì bēi", 不放 is
+  "bú fàng". It is checked against the Unicode Han Database one syllable per
+  character, so a dropped or invented syllable will be rejected.`;
 
 async function generate(client, words) {
   const listing = words.map((w) => `${w.zh} (${w.py}) — ${w.en}`).join('\n');
@@ -162,8 +169,8 @@ async function generate(client, words) {
 function write(map) {
   const entries = Object.entries(map).sort(([a], [b]) => (a < b ? -1 : 1));
   const body = entries
-    .map(([zh, [sentence, english]]) =>
-      `  '${zh}': [${JSON.stringify(sentence)}, ${JSON.stringify(english)}]`
+    .map(([zh, [sentence, pinyin, english]]) =>
+      `  '${zh}': [${JSON.stringify(sentence)}, ${JSON.stringify(pinyin)}, ${JSON.stringify(english)}]`
     )
     .join(',\n');
 
@@ -175,7 +182,7 @@ function write(map) {
 // is the progress key, so the join is the same one the rest of the app makes.
 // A word with no entry here simply gets no example.
 //
-// Each pair is [Chinese, English]. The English translates the Chinese sentence
+// Each entry is [Chinese, pinyin, English]. The English translates the Chinese
 // rather than standing alone — the two are shown together, so they have to line
 // up.
 //
@@ -210,7 +217,7 @@ if (flag('--check')) {
   for (const word of words) {
     const entry = SENTENCES[word.zh];
     if (!entry) continue;
-    const why = reject(word, entry[0], entry[1]);
+    const why = reject(word, entry[0], entry[1], entry[2]);
     if (why) {
       console.log(`${word.zh}: ${why}`);
       bad += 1;
@@ -250,13 +257,13 @@ for (let i = 0; i < missing.length; i += BATCH) {
       rejected += 1;
       continue;
     }
-    const why = reject(word, item.chinese, item.english);
+    const why = reject(word, item.chinese, item.pinyin, item.english);
     if (why) {
       console.error(`${word.zh}: rejected — ${why}`);
       rejected += 1;
       continue;
     }
-    merged[word.zh] = [item.chinese, item.english];
+    merged[word.zh] = [item.chinese, item.pinyin, item.english];
     written += 1;
   }
   write(merged);

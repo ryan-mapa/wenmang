@@ -363,7 +363,7 @@ button.stat { cursor: pointer; }
 }
 /* Characters want more air between them and less weight than a Latin word. */
 .prompt.is-hanzi { font-family: var(--han); font-weight: 500; letter-spacing: 0.04em; }
-.prompt-sub { margin: 0 0 18px; min-height: 1.3em; font-size: 15px; color: var(--muted); letter-spacing: 0.02em; }
+.prompt-sub { margin: 0 0 10px; min-height: 1.3em; font-size: 15px; color: var(--muted); letter-spacing: 0.02em; }
 
 .choices { display: grid; gap: 10px; }
 
@@ -411,13 +411,17 @@ button.stat { cursor: pointer; }
 /* Holds its height whether or not the sentence is showing, so revealing one
    does not shove the answer buttons down under the thumb that is reaching for
    them. */
+/* Holds its height whether or not a sentence is showing, so revealing one does
+   not shove the answer buttons down under the thumb reaching for them. Three
+   lines is the tallest it gets — Chinese, pinyin and English — so that is what
+   it reserves. */
 .example {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 2.1rem;
-  margin: 4px 0 14px;
+  min-height: 2rem;
+  margin: 0 0 16px;
 }
 
 .example-toggle {
@@ -433,8 +437,13 @@ button.stat { cursor: pointer; }
 .example-toggle:hover { color: var(--ink); border-color: var(--muted); }
 .example-toggle:focus-visible { outline: 2px solid var(--jade); outline-offset: 2px; }
 
-.example-lines { display: flex; flex-direction: column; gap: 3px; text-align: center; }
+/* A paragraph carries a 1em margin top and bottom by default, which put about
+   sixteen pixels between every line and made three of them read as three
+   separate blocks rather than one sentence in three scripts. */
+.example-lines { display: flex; flex-direction: column; gap: 2px; text-align: center; }
+.example-lines p { margin: 0; line-height: 1.45; }
 .example-lines .zh { font-family: var(--han); font-size: 17px; color: var(--ink-soft); }
+.example-lines .py { font-size: 13px; color: var(--muted); letter-spacing: 0.02em; }
 .example-lines .en { font-size: 14px; color: var(--muted); }
 
 /* ---------------------------------------------------------------- speech */

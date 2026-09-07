@@ -20,6 +20,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DECKS, STAGE_COUNT, STAGE_NAMES } from '../source/vocab.js';
+import { SENTENCES } from '../source/sentences.js';
 
 const unihanDir = process.argv[2];
 if (!unihanDir) {
@@ -196,8 +197,43 @@ for (const deck of DECKS) {
   );
 }
 
+// ---- example sentences ---------------------------------------------------
+//
+// The same alignment the vocabulary gets. A sentence's pinyin is longer and
+// therefore easier to get wrong than a word's, and it is read aloud by learners
+// who cannot yet check it against the characters — so it is worth the pass.
+let sentencesChecked = 0;
+let sentencesUnknown = 0;
+
+for (const [headword, entry] of Object.entries(SENTENCES)) {
+  if (!Array.isArray(entry) || entry.length !== 3) {
+    problems.push(`sentence ${headword}  is not [Chinese, pinyin, English]`);
+    continue;
+  }
+  const [chinese, pinyin, english] = entry;
+
+  if (!chinese.includes(headword)) {
+    problems.push(`sentence ${headword}  does not contain its own headword`);
+  }
+  if (!english || english.trim().length < 3) {
+    problems.push(`sentence ${headword}  has no English`);
+  }
+  if (/[a-zA-Z]/.test(chinese)) {
+    problems.push(`sentence ${headword}  has Latin letters on the Chinese side`);
+  }
+
+  // Punctuation is dropped from both sides: 。 and ？ have no reading, and the
+  // aligner counts one syllable per character.
+  const chars = [...chinese].filter((ch) => /\p{Script=Han}/u.test(ch));
+  const ok = align(chars, syllableView(pinyin));
+  if (ok === null) sentencesUnknown += 1;
+  else if (!ok) problems.push(`sentence ${headword}  pinyin "${pinyin}" does not line up with ${chinese}`);
+  sentencesChecked += 1;
+}
+
 console.log('');
 console.log(`decks: ${DECKS.length}   entries: ${count}   distinct words: ${byKey.size}`);
+console.log(`sentences: ${sentencesChecked} checked${sentencesUnknown ? `, ${sentencesUnknown} with unknown characters` : ''}`);
 if (unknown) console.log(`no Unihan readings for ${unknown} entr${unknown === 1 ? 'y' : 'ies'} — not checked`);
 
 if (problems.length) {
