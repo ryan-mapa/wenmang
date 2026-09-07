@@ -325,7 +325,13 @@ function renderStages() {
       button.setAttribute('aria-pressed', String(stages.includes(stage) && info.unlocked));
       button.innerHTML =
         `<span class="stage-name">${STAGE_NAMES[stage]}</span>` +
-        `<span class="stage-meta">${info.total === 0 ? 'empty' : `${info.mastered}/${info.total}`}</span>` +
+        // "locked" and "empty" are different things and were reading the same.
+        // On the combined deck a locked stage reports no words at all — its
+        // pool is the decks that have opened it, and none have — so testing the
+        // count alone called every locked stage empty.
+        `<span class="stage-meta">${
+          !info.unlocked ? 'locked' : info.total === 0 ? 'empty' : `${info.mastered}/${info.total}`
+        }</span>` +
         `<span class="stage-fill" style="width:${info.mastery * 100}%"></span>`;
       button.addEventListener('click', () => toggleStage(stage));
       return button;
